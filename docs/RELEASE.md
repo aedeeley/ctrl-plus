@@ -1,0 +1,104 @@
+# Publishing a release — ctrl+
+
+This guide is for publishing new versions of the desktop app to GitHub Releases. If you normally work on websites, think of this as the desktop equivalent of deploying a new build — except users download an installer instead of visiting a URL.
+
+## Where users download
+
+Published installers live on the GitHub **Releases** page:
+
+`https://github.com/YOUR_USERNAME/ctrl-plus/releases/latest`
+
+Each release includes:
+
+| File | Who should use it |
+|------|---------------------|
+| `ctrl+_VERSION_x64-setup.exe` | Most Windows PCs (recommended) |
+| `ctrl+_VERSION_x64_en-US.msi` | Alternative x64 installer (IT / enterprise) |
+| `ctrl+_VERSION_aarch64-setup.exe` | Windows on ARM (Surface Pro X, Snapdragon PCs) |
+
+ARM64 builds use NSIS only — MSI is not supported for Windows ARM.
+
+## How releases are built
+
+Pushing a version tag (e.g. `v0.1.0`) triggers [`.github/workflows/release.yml`](../.github/workflows/release.yml). GitHub Actions:
+
+1. Builds the app on Windows for x64 and ARM64
+2. Creates a **draft** release with installers attached
+3. You review the draft, then click **Publish release**
+
+Draft releases are intentional — you can verify the files before making them public.
+
+## Before your first release
+
+1. **Create the GitHub repo** (empty, no template files)
+2. **Push this project** to `main`
+3. **Add a repository secret** (Settings → Secrets and variables → Actions):
+   - Name: `LICENSE_JWT_SECRET`
+   - Value: same JWT secret as your production license server at `ctrlplus.pro`
+
+   Without this secret, Pro license activation will not work in release builds.
+
+## Publishing a new version
+
+### 1. Bump the version
+
+Update the version in all three files (keep them in sync):
+
+- [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json) — `"version"`
+- [`src-tauri/Cargo.toml`](../src-tauri/Cargo.toml) — `version`
+- [`package.json`](../package.json) — `"version"`
+
+Example: change `0.1.0` → `0.1.1` everywhere.
+
+### 2. Commit and tag
+
+```bash
+git add -A
+git commit -m "chore: release v0.1.1"
+git tag v0.1.1
+git push origin main --tags
+```
+
+The tag name must start with `v` (e.g. `v0.1.1`) — that is what triggers the workflow.
+
+### 3. Wait for the build
+
+Open the **Actions** tab on GitHub. Two jobs should run (x64 and ARM64). When both succeed, a draft release appears under **Releases**.
+
+### 4. Publish the draft
+
+1. Open the draft release
+2. Confirm all expected installer files are attached
+3. Edit release notes if needed
+4. Click **Publish release**
+
+## Local build (optional)
+
+To build installers on your machine instead of CI:
+
+```bash
+npm install
+npm run tauri:build
+```
+
+Output:
+
+- `src-tauri/target/release/bundle/nsis/ctrl+_VERSION_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/ctrl+_VERSION_x64_en-US.msi`
+
+## Windows SmartScreen warnings
+
+Release builds are **unsigned** by default. Windows may show a SmartScreen warning on first install. This is normal for indie desktop apps.
+
+To reduce warnings later:
+
+- [Azure Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/) (~$10/mo)
+- [Microsoft Store](STORE.md) (free code signing for individual developers)
+
+## Future: Mac and Linux
+
+The release workflow is Windows-only today. Adding Mac/Linux later requires porting the Rust clipboard and paste code, then adding matrix rows to the workflow — the same tag-based release process will apply.
+
+## Future: auto-update
+
+The Tauri updater plugin can check GitHub Releases and prompt users to install new versions. Not configured yet.
