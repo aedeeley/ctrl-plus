@@ -6,14 +6,12 @@ Press **Ctrl+Shift+V**, search your history, and paste any previous copy. Everyt
 
 ## Downloads
 
-Installers for the latest release are on [GitHub Releases](https://github.com/YOUR_USERNAME/ctrl-plus/releases/latest):
+Installers for the latest release are on [GitHub Releases](https://github.com/aedeeley/ctrl-plus/releases/latest):
 
 | Platform | File |
 |----------|------|
 | Windows (most PCs) | `ctrl+_*_x64-setup.exe` |
 | Windows on ARM | `ctrl+_*_aarch64-setup.exe` |
-
-Replace `YOUR_USERNAME` with your GitHub username after creating the repo.
 
 ## Free vs Pro
 

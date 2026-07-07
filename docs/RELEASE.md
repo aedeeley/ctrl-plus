@@ -6,7 +6,7 @@ This guide is for publishing new versions of the desktop app to GitHub Releases.
 
 Published installers live on the GitHub **Releases** page:
 
-`https://github.com/YOUR_USERNAME/ctrl-plus/releases/latest`
+`https://github.com/aedeeley/ctrl-plus/releases/latest`
 
 Each release includes:
 
