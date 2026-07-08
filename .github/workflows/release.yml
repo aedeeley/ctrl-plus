@@ -45,13 +45,14 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "ctrl+ ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download and install."
+          releaseBody: "Draft release — publishing after all builds finish."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
   publish-release:
     needs: publish
+    if: ${{ needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -69,10 +70,24 @@ jobs:
               tag,
             });
 
+            const body = [
+              "## What's new",
+              "- Fix Pro license activation (JWT verification)",
+              '- Add "Remove from this device" to free your license key',
+              "- Free tier stays locked until activation",
+              "",
+              "## Downloads",
+              "- **Windows (x64):** `ctrl+_${tag.replace(/^v/, "")}_x64-setup.exe` (recommended)",
+              "- **Windows (x64):** `ctrl+_${tag.replace(/^v/, "")}_x64_en-US.msi`",
+              "- **Windows on ARM:** `ctrl+_${tag.replace(/^v/, "")}_arm64-setup.exe`",
+            ].join("\n");
+
             await github.rest.repos.updateRelease({
               owner,
               repo,
               release_id: release.id,
+              name: `ctrl+ ${tag}`,
+              body,
               draft: false,
               make_latest: true,
             });

@@ -599,6 +599,7 @@ pub fn run() {
             deactivate_license,
             unlock_dev_pro,
             open_upgrade_page
-        ])        .run(tauri::generate_context!())
+        ])
+        .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
