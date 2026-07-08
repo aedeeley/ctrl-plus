@@ -24,11 +24,14 @@ pub const LICENSE_TIER_SETTING: &str = "license_tier";
 pub const LICENSE_TOKEN_SETTING: &str = "license_token";
 pub const LICENSE_ACTIVATED_AT_SETTING: &str = "license_activated_at";
 
+#[cfg(debug_assertions)]
 pub const DEV_LICENSE_KEY: &str = "CTRL-DEV-UNLOCK";
 
+#[cfg(debug_assertions)]
 const DEFAULT_LICENSE_JWT_SECRET: &str = "ctrl-plus-dev-jwt-secret-change-in-production";
 
 /// Legacy placeholder from early ctrlplus.pro `.env` deployments.
+#[cfg(debug_assertions)]
 const LEGACY_LICENSE_JWT_SECRET: &str = "change-me-to-a-long-random-secret";
 
 fn license_jwt_secret() -> &'static str {
@@ -37,13 +40,20 @@ fn license_jwt_secret() -> &'static str {
 
 fn license_jwt_secrets() -> Vec<&'static str> {
     let primary = license_jwt_secret();
-    let mut secrets = vec![primary];
-    for fallback in [DEFAULT_LICENSE_JWT_SECRET, LEGACY_LICENSE_JWT_SECRET] {
-        if fallback != primary && !secrets.contains(&fallback) {
-            secrets.push(fallback);
+    #[cfg(debug_assertions)]
+    {
+        let mut secrets = vec![primary];
+        for fallback in [DEFAULT_LICENSE_JWT_SECRET, LEGACY_LICENSE_JWT_SECRET] {
+            if fallback != primary && !secrets.contains(&fallback) {
+                secrets.push(fallback);
+            }
         }
+        secrets
     }
-    secrets
+    #[cfg(not(debug_assertions))]
+    {
+        vec![primary]
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,7 +117,7 @@ struct LicenseClaims {
     tier: String,
     #[serde(rename = "machineId")]
     machine_id: String,
-    exp: Option<u64>,
+    exp: u64,
 }
 
 pub fn machine_id() -> String {
@@ -173,10 +183,12 @@ pub fn is_pro(db: &Database) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(debug_assertions)]
 pub fn dev_license_token(key: &str) -> String {
     format!("dev.{key}.{}.pro", machine_id())
 }
 
+#[cfg(debug_assertions)]
 pub fn activate_dev_license() -> Result<(LicenseStatus, String), String> {
     let key = DEV_LICENSE_KEY.to_string();
     let token = dev_license_token(&key);
@@ -194,8 +206,14 @@ pub fn activate_dev_license() -> Result<(LicenseStatus, String), String> {
     Ok((status, token))
 }
 
+#[cfg(debug_assertions)]
 pub fn is_dev_license_key(key: &str) -> bool {
     normalize_license_key(key) == DEV_LICENSE_KEY
+}
+
+#[cfg(not(debug_assertions))]
+pub fn is_dev_license_key(_key: &str) -> bool {
+    false
 }
 
 fn verify_token(token: &str, expected_key: Option<&str>) -> bool {
@@ -203,21 +221,14 @@ fn verify_token(token: &str, expected_key: Option<&str>) -> bool {
         return false;
     }
 
+    #[cfg(debug_assertions)]
     if token.starts_with("dev.") {
         return verify_dev_token(token, expected_key);
     }
 
-    if license_jwt_secrets()
+    license_jwt_secrets()
         .into_iter()
         .any(|secret| verify_token_with_secret(token, expected_key, secret))
-    {
-        return true;
-    }
-
-    // ctrlplus.pro may sign with a production secret that is not baked into this
-    // build. The activation response is already trusted over HTTPS, so fall back
-    // to validating payload claims when the signature secret is unknown.
-    verify_token_claims_only(token, expected_key)
 }
 
 fn verify_token_with_secret(
@@ -227,22 +238,8 @@ fn verify_token_with_secret(
 ) -> bool {
     let key = DecodingKey::from_secret(secret.as_bytes());
     let mut validation = Validation::new(Algorithm::HS256);
-    validation.validate_exp = false;
-    validation.required_spec_claims.clear();
-
-    let Ok(token_data) = decode::<LicenseClaims>(token, &key, &validation) else {
-        return false;
-    };
-
-    claims_match_license(&token_data.claims, expected_key)
-}
-
-fn verify_token_claims_only(token: &str, expected_key: Option<&str>) -> bool {
-    let key = DecodingKey::from_secret(b"unused");
-    let mut validation = Validation::new(Algorithm::HS256);
-    validation.insecure_disable_signature_validation();
-    validation.validate_exp = false;
-    validation.required_spec_claims.clear();
+    validation.validate_exp = true;
+    validation.set_required_spec_claims(&["exp"]);
 
     let Ok(token_data) = decode::<LicenseClaims>(token, &key, &validation) else {
         return false;
@@ -252,6 +249,14 @@ fn verify_token_claims_only(token: &str, expected_key: Option<&str>) -> bool {
 }
 
 fn claims_match_license(claims: &LicenseClaims, expected_key: Option<&str>) -> bool {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    if claims.exp <= now {
+        return false;
+    }
+
     if claims.tier != "pro" {
         return false;
     }
@@ -269,6 +274,7 @@ fn claims_match_license(claims: &LicenseClaims, expected_key: Option<&str>) -> b
     true
 }
 
+#[cfg(debug_assertions)]
 fn verify_dev_token(token: &str, expected_key: Option<&str>) -> bool {
     let payload = token.strip_prefix("dev.").unwrap_or("");
     let parts: Vec<&str> = payload.split('.').collect();
@@ -471,8 +477,8 @@ mod tests {
 
         let decoding_key = DecodingKey::from_secret(license_jwt_secret().as_bytes());
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.validate_exp = false;
-        validation.required_spec_claims.clear();
+        validation.validate_exp = true;
+        validation.set_required_spec_claims(&["exp"]);
         let decoded = decode::<LicenseClaims>(&token, &decoding_key, &validation)
             .expect("decode should succeed");
         assert_eq!(decoded.claims.machine_id, machine);
@@ -507,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn verify_token_accepts_unknown_signing_secret_when_claims_match() {
+    fn verify_token_rejects_unknown_signing_secret() {
         let machine = machine_id();
         let key = "CTRL-TEST-TEST-TEST";
         let exp = SystemTime::now()
@@ -528,6 +534,31 @@ mod tests {
         )
         .unwrap();
 
-        assert!(verify_token(&token, Some(key)));
+        assert!(!verify_token(&token, Some(key)));
+    }
+
+    #[test]
+    fn verify_token_rejects_expired_jwt() {
+        let machine = machine_id();
+        let key = "CTRL-TEST-TEST-TEST";
+        let exp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .saturating_sub(60);
+        let payload = WebsiteTokenPayload {
+            sub: key.to_string(),
+            tier: "pro".to_string(),
+            machineId: machine.clone(),
+            exp,
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &payload,
+            &EncodingKey::from_secret(license_jwt_secret().as_bytes()),
+        )
+        .unwrap();
+
+        assert!(!verify_token(&token, Some(key)));
     }
 }

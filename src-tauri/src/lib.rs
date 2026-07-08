@@ -63,10 +63,19 @@ async fn activate_license(
     app: AppHandle,
     key: String,
 ) -> Result<LicenseStatus, String> {
-    let (status, token) = if license::is_dev_license_key(&key) {
-        license::activate_dev_license()?
-    } else {
-        license::activate_license_online(&key).await?
+    let (status, token) = {
+        #[cfg(debug_assertions)]
+        {
+            if license::is_dev_license_key(&key) {
+                license::activate_dev_license()?
+            } else {
+                license::activate_license_online(&key).await?
+            }
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            license::activate_license_online(&key).await?
+        }
     };
 
     apply_pro_activation(&state, &app, status, &token)
@@ -157,6 +166,7 @@ fn unlock_dev_pro_if_needed(state: &AppState, app: &AppHandle) {
     }
 }
 
+#[cfg(debug_assertions)]
 #[tauri::command]
 fn unlock_dev_pro(state: State<AppState>, app: AppHandle) -> Result<LicenseStatus, String> {
     let (status, token) = license::activate_dev_license()?;
@@ -587,19 +597,39 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            get_history,
-            clear_history,
-            get_settings,
-            update_settings,
-            paste_item,
-            hide_overlay,
-            get_license_status,
-            activate_license,
-            deactivate_license,
-            unlock_dev_pro,
-            open_upgrade_page
-        ])
+        .invoke_handler({
+            #[cfg(debug_assertions)]
+            {
+                tauri::generate_handler![
+                    get_history,
+                    clear_history,
+                    get_settings,
+                    update_settings,
+                    paste_item,
+                    hide_overlay,
+                    get_license_status,
+                    activate_license,
+                    deactivate_license,
+                    unlock_dev_pro,
+                    open_upgrade_page
+                ]
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                tauri::generate_handler![
+                    get_history,
+                    clear_history,
+                    get_settings,
+                    update_settings,
+                    paste_item,
+                    hide_overlay,
+                    get_license_status,
+                    activate_license,
+                    deactivate_license,
+                    open_upgrade_page
+                ]
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
