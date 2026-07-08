@@ -45,17 +45,34 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "ctrl+ ${{ github.ref_name }}"
-          releaseBody: |
-            ## ctrl+ v0.1.1
-
-            - Fix Pro license activation (JWT verification)
-            - Add "Remove from this device" to free your license key
-            - Free tier stays locked until activation
-
-            **Downloads**
-            - Windows (x64): `ctrl+_0.1.1_x64-setup.exe` (recommended)
-            - Windows (x64): `ctrl+_0.1.1_x64_en-US.msi`
-            - Windows on ARM: `ctrl+_0.1.1_arm64-setup.exe`
-          releaseDraft: false
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  publish-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Publish GitHub release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace("refs/tags/", "");
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag,
+            });
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.id,
+              draft: false,
+              make_latest: true,
+            });
