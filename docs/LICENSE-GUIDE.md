@@ -23,7 +23,7 @@ This license is why the repo is public: anyone can verify that clipboard data st
 
 | Tier | Price | How it works |
 |------|-------|--------------|
-| **Free** | $0 | Full app with limits (5 history items, 2 themes, etc.) |
+| **Free** | $0 | Full app with limits (5 history items, 2 themes, default appearance, etc.) |
 | **Pro** | $5 one-time | License key from [ctrlplus.pro](https://ctrlplus.pro/#buy); activates in Settings |
 
 The Pro key is a **product purchase**, not permission to reuse the source commercially. Free-tier users do not sign anything; installing and using the free app is offered at no charge.

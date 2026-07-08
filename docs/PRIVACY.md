@@ -1,6 +1,6 @@
 # Privacy Policy — ctrl+
 
-**Last updated:** July 7, 2026
+**Last updated:** July 8, 2026
 
 ## Summary
 
@@ -18,19 +18,22 @@ This includes:
 
 - Clipboard text content
 - Timestamp of each copy
-- Your settings (hotkey, history limit, theme, startup preference)
+- Pin and sort order (Pro)
+- Your settings (hotkey, history limit, theme, border, font, shadow, overlay position, startup preference)
 - Pro license key and activation token (if upgraded)
 
 ## Data sent over the network
 
 The free app does **not** upload clipboard content.
 
-If you upgrade to Pro and activate a license, the app sends:
+Network requests are limited to:
 
-- Your license key
-- A hashed machine identifier (for activation limits)
+| When | What is sent | Where |
+|------|--------------|-------|
+| Pro activation | License key + hashed machine identifier | ctrlplus.pro license server |
+| Check for updates (optional) | App version check | GitHub Releases (`latest.json`) |
 
-to the ctrl+ license server. No clipboard data is included.
+No clipboard data is included in any network request.
 
 ## Data we do not collect
 
@@ -47,6 +50,7 @@ You can:
 - Clear history from Settings
 - Uninstall the app to remove all local data
 - Disable launch on startup from Settings
+- Deactivate Pro to remove the license token from this device
 
 ## Contact
 

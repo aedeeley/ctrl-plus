@@ -4,8 +4,8 @@
 
 | Tier | Price | Includes |
 |------|-------|----------|
-| **Free** | $0 | 5 clipboard items, Midnight + Paper themes, default border/font/position, hotkey + startup |
-| **Pro** | **$5 one-time** | Up to 5,000 items, all themes, borders, fonts, popup positions |
+| **Free** | $0 | 5 clipboard items, Midnight + Paper themes, default border/font/shadow, hotkey + startup, drag-to-move overlay |
+| **Pro** | **$5 one-time** | Up to 5,000 items, all 30 themes, borders, fonts, shadows, pin & reorder, number hotkeys `1`–`9` |
 
 ## Why $5 one-time
 

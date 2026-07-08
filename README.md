@@ -11,15 +11,21 @@ Get the latest installers from **[GitHub Releases](https://github.com/aedeeley/c
 - **Windows (most PCs):** download `ctrl+_*_x64-setup.exe`
 - **Windows on ARM:** download `ctrl+_*_arm64-setup.exe`
 
+The app can also check for and install updates in-app from **Settings → About**.
+
 ## Free vs Pro
 
 | | Free | Pro ($5) |
 |---|------|----------|
 | History | 5 items | Up to 5,000 |
-| Themes | Midnight + Paper | All 11 |
-| Borders, fonts, position | Default only | Full customization |
+| Themes | Midnight + Paper | All 30 |
+| Borders, fonts, shadows | Default only | Full customization |
+| Pin & reorder | — | ✓ |
+| Number hotkeys | `1`–`5` | `1`–`9` |
 
-Upgrade at **Settings → Upgrade** or at [ctrlplus.pro](https://ctrlplus.pro/#buy).
+Everyone can drag the overlay to reposition it and reset to center in Settings.
+
+Upgrade at **Settings → ctrl+ pro** or at [ctrlplus.pro](https://ctrlplus.pro/#buy).
 
 ## Source code and pricing
 
@@ -32,11 +38,14 @@ This repository is **public for transparency**: you can read the code to confirm
 ## Features
 
 - Background text clipboard monitoring
-- Global hotkey overlay (`Ctrl+Shift+V` by default)
-- Search, wheel navigation, and keyboard selection
+- Global hotkey overlay (`Ctrl+Shift+V` by default, configurable)
+- Search, wheel navigation, arrow keys, and number hotkeys for quick paste
 - Paste back into the previously focused app
-- System tray with hide-on-close behavior
-- Themes, borders, fonts, and popup position (Pro)
+- System tray with hide-on-close behavior; launch on startup
+- Drag-to-move overlay with remembered position
+- 30 color themes, 7 border radii, 7 fonts, and 5 shadow presets (Pro for customization beyond defaults)
+- Pin and reorder clips (Pro)
+- In-app updates from GitHub Releases
 - Local SQLite storage — clipboard data never uploaded
 
 ## Requirements
@@ -63,18 +72,32 @@ npm run tauri:build
 
 Installers are written to:
 
-- `src-tauri/target/release/bundle/nsis/ctrl+_0.1.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/ctrl+_0.1.0_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/ctrl+_VERSION_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/ctrl+_VERSION_x64_en-US.msi`
+
+Replace `VERSION` with the current version in `package.json` (e.g. `0.2.1`).
 
 ## Usage
 
 1. Launch **ctrl+** — it runs in the system tray.
 2. Copy text as usual; history is captured automatically.
-3. Press **Ctrl+Shift+V** to open the overlay.
-4. Search, scroll, or arrow through items; press **Enter** or click to paste.
-5. Press **Esc** or click outside to close.
+3. Press **Ctrl+Shift+V** (or your configured hotkey) to open the overlay.
+4. Search, scroll, or arrow through items; press **Enter**, click, or press `1`–`5` (Pro: `1`–`9`) to paste.
+5. Drag the header to move the overlay; use **Appearance → Reset to center** to restore default placement.
+6. Press **Esc** or click outside to close.
 
-Open **Settings** from the gear icon to change hotkey, theme, or activate Pro.
+Open **Settings** from the gear icon to change hotkey, appearance, startup, or activate Pro.
+
+### Keyboard shortcuts (overlay)
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+Shift+V` | Toggle overlay (default; configurable in Settings) |
+| `↑` / `↓` | Move selection |
+| `Enter` | Paste selected item |
+| `1`–`5` / `1`–`9` | Quick-paste by index (Pro: up to 9) |
+| `Esc` | Close overlay |
+| Mouse wheel | Move selection |
 
 ## Project structure
 
@@ -86,6 +109,7 @@ src-tauri/src/
   license.rs            Pro license state + activation
   paste.rs              Focus restore + paste injection
   settings.rs           App settings + tier limits
+  window_util.rs        Overlay positioning and monitor handling
   lib.rs                Tauri commands, tray, hotkeys
 docs/                   Store, pricing, privacy, release guides
 ```

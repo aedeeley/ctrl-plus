@@ -12,7 +12,7 @@
 1. [Microsoft Partner Center](https://partner.microsoft.com/) account (individual registration is free)
 2. Production build: `npm run tauri:build`
 3. Privacy policy URL (host `docs/PRIVACY.md` on your site or GitHub Pages)
-4. App screenshots (overlay, settings, tray icon)
+4. App screenshots (overlay, settings, appearance tab, tray icon)
 5. 310x310 and 150x150 PNG icons (use `src-tauri/icons/` assets)
 
 ## Package format
@@ -39,7 +39,7 @@ For Store submission, you may need to convert to MSIX:
 - [ ] Price: see [PRICING.md](PRICING.md)
 - [ ] Privacy policy link
 - [ ] System requirements: Windows 10 1809+, WebView2 runtime
-- [ ] Screenshots (至少 1, recommend 4)
+- [ ] Screenshots (at least 1, recommend 4)
 - [ ] Support contact email
 
 ## Suggested listing copy
@@ -47,6 +47,15 @@ For Store submission, you may need to convert to MSIX:
 **Short description**
 
 > Never lose a copy again. ctrl+ keeps your clipboard history and lets you paste any previous item with Ctrl+Shift+V.
+
+**Long description (feature highlights)**
+
+> - Clipboard history with search and keyboard navigation
+> - Paste back into the app you were using
+> - 30 themes with border, font, and shadow customization (Pro)
+> - Pin and reorder important clips (Pro)
+> - Runs in the system tray; launch on startup
+> - All clipboard data stays on your device
 
 **Keywords**
 
@@ -57,6 +66,8 @@ clipboard, paste, history, productivity, copy, hotkey
 1. Bump version in `src-tauri/tauri.conf.json` and `package.json`
 2. Run `npm run tauri:build`
 3. Upload new package in Partner Center
+
+Note: direct-download users receive in-app updates via GitHub Releases (see [RELEASE.md](RELEASE.md)). Store builds would use Partner Center's update flow instead.
 
 ## Alternative: direct download
 
