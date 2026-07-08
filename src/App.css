@@ -49,6 +49,9 @@ input {
   --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
   --overlay-inset-x: 20px;
   --badge-bg: rgba(255, 255, 255, 0.06);
+  --clip-row-height: 42px;
+  --clip-row-gap: 6px;
+  --clip-visible-rows: 5;
 
   width: 100%;
   height: auto;
@@ -651,7 +654,10 @@ input {
 .clipboard-list-viewport {
   flex: 0 1 auto;
   min-height: 0;
-  max-height: min(280px, calc(100dvh - 220px));
+  max-height: calc(
+    var(--clip-row-height) * var(--clip-visible-rows) +
+      var(--clip-row-gap) * (var(--clip-visible-rows) - 1)
+  );
   overflow: hidden;
 }
 
@@ -663,12 +669,14 @@ input {
 .clipboard-list-inner {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--clip-row-gap);
   will-change: transform;
 }
 
 .clipboard-item {
   width: 100%;
+  height: var(--clip-row-height);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
