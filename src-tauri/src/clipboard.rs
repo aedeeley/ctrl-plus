@@ -9,6 +9,9 @@ use tauri::{AppHandle, Emitter};
 use crate::database::Database;
 use crate::settings::AppSettings;
 
+/// Maximum clipboard text size stored per item (1 MiB).
+const MAX_CLIPBOARD_ITEM_BYTES: usize = 1024 * 1024;
+
 pub fn start_clipboard_monitor(
     app: AppHandle,
     db: Arc<Mutex<Database>>,
@@ -48,6 +51,10 @@ impl ClipboardHandler for ClipboardHandlerImpl {
 
         let trimmed = content.trim();
         if trimmed.is_empty() {
+            return CallbackResult::Next;
+        }
+
+        if trimmed.len() > MAX_CLIPBOARD_ITEM_BYTES {
             return CallbackResult::Next;
         }
 
