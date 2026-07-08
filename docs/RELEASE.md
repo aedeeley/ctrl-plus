@@ -14,7 +14,7 @@ Each release includes:
 |------|---------------------|
 | `ctrl+_VERSION_x64-setup.exe` | Most Windows PCs (recommended) |
 | `ctrl+_VERSION_x64_en-US.msi` | Alternative x64 installer (IT / enterprise) |
-| `ctrl+_VERSION_aarch64-setup.exe` | Windows on ARM (Surface Pro X, Snapdragon PCs) |
+| `ctrl+_VERSION_arm64-setup.exe` | Windows on ARM (Surface Pro X, Snapdragon PCs) |
 
 ARM64 builds use NSIS only — MSI is not supported for Windows ARM.
 

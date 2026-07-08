@@ -1,4 +1,4 @@
-# ctrl+
+﻿# ctrl+
 
 A lightweight Windows clipboard manager built with Tauri 2 and React.
 
@@ -6,12 +6,10 @@ Press **Ctrl+Shift+V**, search your history, and paste any previous copy. Everyt
 
 ## Downloads
 
-Installers for the latest release are on [GitHub Releases](https://github.com/aedeeley/ctrl-plus/releases/latest):
+Get the latest installers from **[GitHub Releases](https://github.com/aedeeley/ctrl-plus/releases/latest)**:
 
-| Platform | File |
-|----------|------|
-| Windows (most PCs) | `ctrl+_*_x64-setup.exe` |
-| Windows on ARM | `ctrl+_*_aarch64-setup.exe` |
+- **Windows (most PCs):** download `ctrl+_*_x64-setup.exe`
+- **Windows on ARM:** download `ctrl+_*_arm64-setup.exe`
 
 ## Free vs Pro
 
