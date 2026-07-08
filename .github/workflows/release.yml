@@ -98,9 +98,8 @@ jobs:
 
             const body = [
               "## What's new",
-              "- Fix Pro license activation when ctrlplus.pro uses a JWT secret not embedded in the app",
-              "- Validate license token claims from the HTTPS activation response as a fallback",
-              "- Keep signature verification when build and server secrets match",
+              "- Near-instant paste: replaced fixed timing delays with adaptive foreground detection, cutting paste latency from ~270-320ms down to roughly 10-70ms",
+              "- Snappier overlay: memoized the clipboard list so hovering, searching, and arrow navigation no longer re-render and re-format every row",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",

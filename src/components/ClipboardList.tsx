@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardItem } from "../types";
 
 interface ClipboardListProps {
@@ -97,6 +97,125 @@ function PinIcon({ filled }: { filled: boolean }) {
   );
 }
 
+interface ClipboardRowProps {
+  item: ClipboardItem;
+  index: number;
+  isActive: boolean;
+  isDragging: boolean;
+  isDragOver: boolean;
+  shortcutLabel: string | null;
+  isPro: boolean;
+  canReorder: boolean;
+  registerRef: (index: number, node: HTMLDivElement | null) => void;
+  onHoverIndexChange: (index: number | null) => void;
+  onSelect: (index: number) => void;
+  onPaste: (item: ClipboardItem) => void;
+  onTogglePin: (item: ClipboardItem) => void;
+  onDragPointerDown: (
+    index: number,
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => void;
+  onDragPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onDragPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onDragPointerCancel: (event: React.PointerEvent<HTMLButtonElement>) => void;
+}
+
+const ClipboardRow = memo(function ClipboardRow({
+  item,
+  index,
+  isActive,
+  isDragging,
+  isDragOver,
+  shortcutLabel,
+  isPro,
+  canReorder,
+  registerRef,
+  onHoverIndexChange,
+  onSelect,
+  onPaste,
+  onTogglePin,
+  onDragPointerDown,
+  onDragPointerMove,
+  onDragPointerUp,
+  onDragPointerCancel,
+}: ClipboardRowProps) {
+  // Cache the expensive derived strings so they only recompute when the
+  // underlying clip changes, not when hover/selection toggles this row.
+  const preview = useMemo(() => previewText(item.content), [item.content]);
+  const timeTitle = useMemo(() => formatTime(item.createdAt), [item.createdAt]);
+
+  const setRef = useCallback(
+    (node: HTMLDivElement | null) => registerRef(index, node),
+    [registerRef, index],
+  );
+
+  const className = [
+    "clipboard-item",
+    isActive ? "active" : "",
+    item.pinned ? "pinned" : "",
+    isDragging ? "dragging" : "",
+    isDragOver ? "drag-over" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div
+      ref={setRef}
+      className={className}
+      onMouseEnter={() => onHoverIndexChange(index)}
+    >
+      {canReorder ? (
+        <button
+          type="button"
+          className="item-drag-handle"
+          aria-label="Drag to reorder"
+          onPointerDown={(event) => onDragPointerDown(index, event)}
+          onPointerMove={onDragPointerMove}
+          onPointerUp={onDragPointerUp}
+          onPointerCancel={onDragPointerCancel}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <DragHandleIcon />
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        className="clipboard-item-body"
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(index);
+          onPaste(item);
+        }}
+      >
+        {shortcutLabel ? (
+          <span className="item-shortcut" aria-hidden="true">
+            {shortcutLabel}
+          </span>
+        ) : null}
+        <span className="item-preview" title={timeTitle}>
+          {preview}
+        </span>
+      </button>
+
+      {isPro ? (
+        <button
+          type="button"
+          className={`item-pin-button${item.pinned ? " pinned" : ""}`}
+          aria-label={item.pinned ? "Unpin clip" : "Pin clip"}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTogglePin(item);
+          }}
+        >
+          <PinIcon filled={item.pinned} />
+        </button>
+      ) : null}
+    </div>
+  );
+});
+
 export function ClipboardList({
   items,
   selectedIndex,
@@ -122,41 +241,27 @@ export function ClipboardList({
 
   const activeIndex = hoveredIndex ?? selectedIndex;
 
-  const findRowIndexAtY = (clientY: number, sourceIndex: number) => {
-    const sourcePinned = items[sourceIndex]?.pinned;
-    if (sourcePinned === undefined) {
-      return null;
-    }
-
-    for (let index = 0; index < items.length; index += 1) {
-      if (items[index].pinned !== sourcePinned) {
-        continue;
+  const registerRef = useCallback(
+    (index: number, node: HTMLDivElement | null) => {
+      if (node) {
+        itemRefs.current.set(index, node);
+      } else {
+        itemRefs.current.delete(index);
       }
+    },
+    [],
+  );
 
-      const element = itemRefs.current.get(index);
-      if (!element) {
-        continue;
-      }
-
-      const rect = element.getBoundingClientRect();
-      if (clientY >= rect.top && clientY < rect.bottom) {
-        return index;
-      }
-    }
-
-    return null;
-  };
-
-  const updateDragOver = (index: number | null) => {
+  const updateDragOver = useCallback((index: number | null) => {
     dragOverRef.current = index;
     setDragOverIndex(index);
-  };
+  }, []);
 
-  const endDrag = () => {
+  const endDrag = useCallback(() => {
     dragSourceRef.current = null;
     updateDragOver(null);
     setDragIndex(null);
-  };
+  }, [updateDragOver]);
 
   useEffect(() => {
     setScrollTop(0);
@@ -210,69 +315,100 @@ export function ClipboardList({
     return () => viewport.removeEventListener("wheel", onWheel, { capture: true });
   }, [items.length, onHoverIndexChange, onSelect, selectedIndex]);
 
-  const handleDragHandlePointerDown = (
-    index: number,
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
-    if (!canReorder || event.button !== 0) {
-      return;
-    }
+  const findRowIndexAtY = useCallback(
+    (clientY: number, sourceIndex: number) => {
+      const sourcePinned = items[sourceIndex]?.pinned;
+      if (sourcePinned === undefined) {
+        return null;
+      }
 
-    event.preventDefault();
-    event.stopPropagation();
-    dragSourceRef.current = index;
-    setDragIndex(index);
-    updateDragOver(index);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
+      for (let index = 0; index < items.length; index += 1) {
+        if (items[index].pinned !== sourcePinned) {
+          continue;
+        }
 
-  const handleDragHandlePointerMove = (
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
-    if (dragSourceRef.current === null) {
-      return;
-    }
+        const element = itemRefs.current.get(index);
+        if (!element) {
+          continue;
+        }
 
-    const targetIndex = findRowIndexAtY(event.clientY, dragSourceRef.current);
-    if (targetIndex !== null) {
-      updateDragOver(targetIndex);
-    }
-  };
+        const rect = element.getBoundingClientRect();
+        if (clientY >= rect.top && clientY < rect.bottom) {
+          return index;
+        }
+      }
 
-  const handleDragHandlePointerUp = (
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
-    if (dragSourceRef.current === null) {
-      return;
-    }
+      return null;
+    },
+    [items],
+  );
 
-    const fromIndex = dragSourceRef.current;
-    const toIndex = dragOverRef.current ?? fromIndex;
+  const handleDragHandlePointerDown = useCallback(
+    (index: number, event: React.PointerEvent<HTMLButtonElement>) => {
+      if (!canReorder || event.button !== 0) {
+        return;
+      }
 
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
+      event.preventDefault();
+      event.stopPropagation();
+      dragSourceRef.current = index;
+      setDragIndex(index);
+      updateDragOver(index);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [canReorder, updateDragOver],
+  );
 
-    endDrag();
+  const handleDragHandlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (dragSourceRef.current === null) {
+        return;
+      }
 
-    if (
-      fromIndex !== toIndex &&
-      items[fromIndex] &&
-      items[toIndex] &&
-      items[fromIndex].pinned === items[toIndex].pinned
-    ) {
-      onReorder(reorderIds(items, fromIndex, toIndex));
-    }
-  };
+      const targetIndex = findRowIndexAtY(event.clientY, dragSourceRef.current);
+      if (targetIndex !== null) {
+        updateDragOver(targetIndex);
+      }
+    },
+    [findRowIndexAtY, updateDragOver],
+  );
 
-  const handleDragHandlePointerCancel = (
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    endDrag();
-  };
+  const handleDragHandlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (dragSourceRef.current === null) {
+        return;
+      }
+
+      const fromIndex = dragSourceRef.current;
+      const toIndex = dragOverRef.current ?? fromIndex;
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      endDrag();
+
+      if (
+        fromIndex !== toIndex &&
+        items[fromIndex] &&
+        items[toIndex] &&
+        items[fromIndex].pinned === items[toIndex].pinned
+      ) {
+        onReorder(reorderIds(items, fromIndex, toIndex));
+      }
+    },
+    [endDrag, items, onReorder],
+  );
+
+  const handleDragHandlePointerCancel = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      endDrag();
+    },
+    [endDrag],
+  );
 
   if (items.length === 0) {
     return (
@@ -294,87 +430,30 @@ export function ClipboardList({
         ref={innerRef}
         style={{ transform: `translateY(-${scrollTop}px)` }}
       >
-        {items.map((item, index) => {
-          const shortcutLabel = showShortcuts
-            ? shortcutLabelForIndex(index, maxShortcuts)
-            : null;
-          const isActive = index === activeIndex;
-          const isDragging = dragIndex === index;
-          const isDragOver = dragOverIndex === index && dragIndex !== index;
-
-          return (
-            <div
-              key={item.id}
-              ref={(node) => {
-                if (node) {
-                  itemRefs.current.set(index, node);
-                } else {
-                  itemRefs.current.delete(index);
-                }
-              }}
-              className={[
-                "clipboard-item",
-                isActive ? "active" : "",
-                item.pinned ? "pinned" : "",
-                isDragging ? "dragging" : "",
-                isDragOver ? "drag-over" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onMouseEnter={() => onHoverIndexChange(index)}
-            >
-              {canReorder ? (
-                <button
-                  type="button"
-                  className="item-drag-handle"
-                  aria-label="Drag to reorder"
-                  onPointerDown={(event) =>
-                    handleDragHandlePointerDown(index, event)
-                  }
-                  onPointerMove={handleDragHandlePointerMove}
-                  onPointerUp={handleDragHandlePointerUp}
-                  onPointerCancel={handleDragHandlePointerCancel}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <DragHandleIcon />
-                </button>
-              ) : null}
-
-              <button
-                type="button"
-                className="clipboard-item-body"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelect(index);
-                  onPaste(item);
-                }}
-              >
-                {shortcutLabel ? (
-                  <span className="item-shortcut" aria-hidden="true">
-                    {shortcutLabel}
-                  </span>
-                ) : null}
-                <span className="item-preview" title={formatTime(item.createdAt)}>
-                  {previewText(item.content)}
-                </span>
-              </button>
-
-              {isPro ? (
-                <button
-                  type="button"
-                  className={`item-pin-button${item.pinned ? " pinned" : ""}`}
-                  aria-label={item.pinned ? "Unpin clip" : "Pin clip"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onTogglePin(item);
-                  }}
-                >
-                  <PinIcon filled={item.pinned} />
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
+        {items.map((item, index) => (
+          <ClipboardRow
+            key={item.id}
+            item={item}
+            index={index}
+            isActive={index === activeIndex}
+            isDragging={dragIndex === index}
+            isDragOver={dragOverIndex === index && dragIndex !== index}
+            shortcutLabel={
+              showShortcuts ? shortcutLabelForIndex(index, maxShortcuts) : null
+            }
+            isPro={isPro}
+            canReorder={canReorder}
+            registerRef={registerRef}
+            onHoverIndexChange={onHoverIndexChange}
+            onSelect={onSelect}
+            onPaste={onPaste}
+            onTogglePin={onTogglePin}
+            onDragPointerDown={handleDragHandlePointerDown}
+            onDragPointerMove={handleDragHandlePointerMove}
+            onDragPointerUp={handleDragHandlePointerUp}
+            onDragPointerCancel={handleDragHandlePointerCancel}
+          />
+        ))}
       </div>
     </div>
   );

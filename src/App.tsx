@@ -502,15 +502,9 @@ function App() {
                   canReorder={isPro && searchIsEmpty}
                   onHoverIndexChange={setHoveredIndex}
                   onSelect={setSelectedIndex}
-                  onPaste={(item) => {
-                    void pasteItem(item);
-                  }}
-                  onTogglePin={(item) => {
-                    void handleTogglePin(item);
-                  }}
-                  onReorder={(orderedIds) => {
-                    void handleReorder(orderedIds);
-                  }}
+                  onPaste={pasteItem}
+                  onTogglePin={handleTogglePin}
+                  onReorder={handleReorder}
                 />
 
                 <footer className="overlay-footer">

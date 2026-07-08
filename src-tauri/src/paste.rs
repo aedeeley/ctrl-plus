@@ -21,6 +21,25 @@ mod platform {
     };
 
     const EM_REPLACESEL: u32 = 0x00C2;
+    const FOREGROUND_POLL_INTERVAL_MS: u64 = 3;
+    const FOREGROUND_POLL_TIMEOUT_MS: u64 = 120;
+    const FOCUS_SETTLE_MS: u64 = 8;
+    const KEY_DELAY_MS: u64 = 6;
+
+    fn wait_for_foreground(target: HWND) {
+        let deadline = std::time::Instant::now()
+            + Duration::from_millis(FOREGROUND_POLL_TIMEOUT_MS);
+        loop {
+            let current = unsafe { GetForegroundWindow() };
+            if current == target {
+                return;
+            }
+            if std::time::Instant::now() >= deadline {
+                return;
+            }
+            thread::sleep(Duration::from_millis(FOREGROUND_POLL_INTERVAL_MS));
+        }
+    }
 
     pub fn capture_paste_target(exclude_hwnd: Option<isize>) -> PasteTarget {
         unsafe {
@@ -55,8 +74,6 @@ mod platform {
     }
 
     pub fn restore_and_paste(target: PasteTarget, text: &str) -> Result<(), String> {
-        thread::sleep(Duration::from_millis(120));
-
         let Some(foreground_value) = target.foreground else {
             return paste_via_keyboard(text);
         };
@@ -85,12 +102,12 @@ mod platform {
             };
 
             let _ = SetForegroundWindow(foreground);
-            thread::sleep(Duration::from_millis(60));
+            wait_for_foreground(foreground);
 
             let focused_input = focus.filter(|hwnd| IsWindow(*hwnd).as_bool());
             if let Some(focus_hwnd) = focused_input {
                 let _ = SetFocus(focus_hwnd);
-                thread::sleep(Duration::from_millis(40));
+                thread::sleep(Duration::from_millis(FOCUS_SETTLE_MS));
 
                 // Native Win32 edit/richedit controls accept a direct text insertion,
                 // which is the most reliable path and never involves the clipboard or
@@ -143,7 +160,7 @@ mod platform {
 
     fn paste_via_keyboard(text: &str) -> Result<(), String> {
         release_stuck_modifiers();
-        thread::sleep(Duration::from_millis(30));
+        thread::sleep(Duration::from_millis(KEY_DELAY_MS));
 
         if simulate_ctrl_v().is_ok() {
             return Ok(());
@@ -164,9 +181,9 @@ mod platform {
 
     fn simulate_ctrl_v() -> Result<(), String> {
         send_single_key(VK_CONTROL, false)?;
-        thread::sleep(Duration::from_millis(40));
+        thread::sleep(Duration::from_millis(KEY_DELAY_MS));
         send_single_key(VK_V, false)?;
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(KEY_DELAY_MS));
         send_single_key(VK_V, true)?;
         send_single_key(VK_CONTROL, true)?;
         Ok(())

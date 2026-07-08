@@ -256,13 +256,13 @@ fn paste_item(state: State<AppState>, app: AppHandle, id: i64) -> Result<(), Str
 
     let target = state.last_paste_target.lock().take();
 
+    set_clipboard_suppressed(&state.ignore_clipboard, &item.content)?;
+
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
         window_util::hide_from_taskbar(&window);
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    set_clipboard_suppressed(&state.ignore_clipboard, &item.content)?;
     restore_and_paste(target.unwrap_or_default(), &item.content)?;
 
     Ok(())
