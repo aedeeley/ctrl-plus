@@ -14,6 +14,11 @@ pub const LICENSE_API_URL: &str = "http://localhost:3000/api/activate";
 #[cfg(not(debug_assertions))]
 pub const LICENSE_API_URL: &str = "https://ctrlplus.pro/api/activate";
 
+#[cfg(debug_assertions)]
+pub const LICENSE_DEACTIVATE_API_URL: &str = "http://localhost:3000/api/deactivate";
+#[cfg(not(debug_assertions))]
+pub const LICENSE_DEACTIVATE_API_URL: &str = "https://ctrlplus.pro/api/deactivate";
+
 pub const LICENSE_KEY_SETTING: &str = "license_key";
 pub const LICENSE_TIER_SETTING: &str = "license_tier";
 pub const LICENSE_TOKEN_SETTING: &str = "license_token";
@@ -70,7 +75,7 @@ impl Default for LicenseStatus {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ActivateRequest {
+struct LicenseMachineRequest {
     key: String,
     machine_id: String,
 }
@@ -86,6 +91,7 @@ struct ActivateResponse {
 struct LicenseClaims {
     sub: String,
     tier: String,
+    #[serde(rename = "machineId")]
     machine_id: String,
     exp: Option<u64>,
 }
@@ -190,6 +196,7 @@ fn verify_token(token: &str, expected_key: Option<&str>) -> bool {
     let key = DecodingKey::from_secret(license_jwt_secret().as_bytes());
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = false;
+    validation.required_spec_claims.clear();
 
     let Ok(token_data) = decode::<LicenseClaims>(token, &key, &validation) else {
         return false;
@@ -242,7 +249,7 @@ pub async fn activate_license_online(key: &str) -> Result<(LicenseStatus, String
         .build()
         .map_err(|e| e.to_string())?;
 
-    let body = ActivateRequest {
+    let body = LicenseMachineRequest {
         key: normalized.clone(),
         machine_id: machine_id(),
     };
@@ -289,6 +296,40 @@ pub async fn activate_license_online(key: &str) -> Result<(LicenseStatus, String
     Ok((status, payload.token))
 }
 
+pub async fn deactivate_license_online(key: &str) -> Result<(), String> {
+    let normalized = normalize_license_key(key);
+    if normalized.is_empty() {
+        return Err("License key is required".to_string());
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let body = LicenseMachineRequest {
+        key: normalized,
+        machine_id: machine_id(),
+    };
+
+    let response = client
+        .post(LICENSE_DEACTIVATE_API_URL)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach license server: {e}"))?;
+
+    if !response.status().is_success() {
+        let message = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Deactivation failed".to_string());
+        return Err(parse_deactivate_error_message(&message));
+    }
+
+    Ok(())
+}
+
 fn normalize_license_key(key: &str) -> String {
     key.trim().to_ascii_uppercase()
 }
@@ -310,5 +351,73 @@ fn parse_error_message(body: &str) -> String {
         "Activation failed".to_string()
     } else {
         body.to_string()
+    }
+}
+
+fn parse_deactivate_error_message(body: &str) -> String {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
+        if let Some(error) = value.get("error").and_then(|v| v.as_str()) {
+            return match error {
+                "invalid_key" => "Invalid license key".to_string(),
+                "not_activated" => "This device is not activated with that license key".to_string(),
+                other => other.to_string(),
+            };
+        }
+    }
+
+    if body.is_empty() {
+        "Deactivation failed".to_string()
+    } else {
+        body.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    #[allow(non_snake_case)]
+    struct WebsiteTokenPayload {
+        sub: String,
+        tier: String,
+        machineId: String,
+        exp: u64,
+    }
+
+    #[test]
+    fn verify_token_accepts_website_jwt_format() {
+        let machine = machine_id();
+        let key = "CTRL-TEST-TEST-TEST";
+        let exp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 86400 * 365 * 10;
+        let payload = WebsiteTokenPayload {
+            sub: key.to_string(),
+            tier: "pro".to_string(),
+            machineId: machine.clone(),
+            exp,
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &payload,
+            &EncodingKey::from_secret(license_jwt_secret().as_bytes()),
+        )
+        .unwrap();
+
+        let decoding_key = DecodingKey::from_secret(license_jwt_secret().as_bytes());
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = false;
+        validation.required_spec_claims.clear();
+        let decoded = decode::<LicenseClaims>(&token, &decoding_key, &validation)
+            .expect("decode should succeed");
+        assert_eq!(decoded.claims.machine_id, machine);
+        assert_eq!(decoded.claims.tier, "pro");
+        assert_eq!(decoded.claims.sub, key);
+        assert!(verify_token(&token, Some(key)));
     }
 }

@@ -72,6 +72,49 @@ async fn activate_license(
     apply_pro_activation(&state, &app, status, &token)
 }
 
+#[tauri::command]
+async fn deactivate_license(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<LicenseStatus, String> {
+    let key = {
+        let db = state.db.lock();
+        let status = license::load_license(&db)?;
+        if status.tier != license::LicenseTier::Pro {
+            return Ok(LicenseStatus::default());
+        }
+        status.key
+    };
+
+    if let Some(key) = key.filter(|value| !value.is_empty()) {
+        if !license::is_dev_license_key(&key) {
+            license::deactivate_license_online(&key).await?;
+        }
+    }
+
+    apply_free_deactivation(&state, &app)
+}
+
+fn apply_free_deactivation(
+    state: &AppState,
+    app: &AppHandle,
+) -> Result<LicenseStatus, String> {
+    let status = LicenseStatus::default();
+    let settings = {
+        let db = state.db.lock();
+        license::save_license(&db, &status, None)?;
+        let mut current = state.settings.lock().clone();
+        current.apply_tier_limits(false);
+        current.save(&db)?;
+        db.enforce_limit(current.effective_history_limit(false))?;
+        current
+    };
+
+    *state.settings.lock() = settings;
+    let _ = app.emit("license-updated", status.clone());
+    Ok(status)
+}
+
 fn apply_pro_activation(
     state: &AppState,
     app: &AppHandle,
@@ -96,6 +139,7 @@ fn apply_pro_activation(
     Ok(status)
 }
 
+#[cfg(debug_assertions)]
 fn unlock_dev_pro_if_needed(state: &AppState, app: &AppHandle) {
     let should_unlock = {
         let db = state.db.lock();
@@ -501,8 +545,8 @@ pub fn run() {
 
             app.manage(state);
 
+            #[cfg(debug_assertions)]
             if let Some(state) = app.try_state::<AppState>() {
-                #[cfg(debug_assertions)]
                 unlock_dev_pro_if_needed(&state, &app.handle());
             }
 
@@ -552,6 +596,7 @@ pub fn run() {
             hide_overlay,
             get_license_status,
             activate_license,
+            deactivate_license,
             unlock_dev_pro,
             open_upgrade_page
         ])        .run(tauri::generate_context!())

@@ -1105,13 +1105,32 @@ input {
 }
 
 .upgrade-banner.pro-active {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   border-color: var(--border-strong);
   background: var(--surface);
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.upgrade-pro-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.upgrade-deactivate-trigger {
+  align-self: flex-start;
+}
+
+.upgrade-deactivate-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .upgrade-copy {
