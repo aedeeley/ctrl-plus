@@ -1409,6 +1409,42 @@ input {
   font-size: 12px;
 }
 
+.update-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.update-status {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.update-status[data-status="available"] {
+  color: var(--text);
+}
+
+.update-notes {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.update-error {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
 .select-field {
   position: relative;
   display: flex;

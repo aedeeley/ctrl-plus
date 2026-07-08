@@ -10,11 +10,11 @@ use database::{ClipboardItem, Database};
 use license::{LicenseStatus, UPGRADE_URL};
 use parking_lot::Mutex;
 use paste::{capture_paste_target, restore_and_paste, PasteTarget};
+use serde::Serialize;
 use settings::AppSettings;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Instant;
-use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::window::Color;
@@ -132,10 +132,7 @@ async fn deactivate_license(
     apply_free_deactivation(&state, &app)
 }
 
-fn apply_free_deactivation(
-    state: &AppState,
-    app: &AppHandle,
-) -> Result<LicenseStatus, String> {
+fn apply_free_deactivation(state: &AppState, app: &AppHandle) -> Result<LicenseStatus, String> {
     let status = LicenseStatus::default();
     let settings = {
         let db = state.db.lock();
@@ -300,12 +297,7 @@ fn show_overlay(app: &AppHandle, state: &AppState) -> Result<(), String> {
 
     let backend_ms = show_started.elapsed().as_secs_f64() * 1000.0;
     *state.overlay_shown_at.lock() = Some(Instant::now());
-    let _ = app.emit(
-        "overlay-shown",
-        OverlayShownEvent {
-            backend_ms,
-        },
-    );
+    let _ = app.emit("overlay-shown", OverlayShownEvent { backend_ms });
 
     window_util::hide_from_taskbar(&window);
     let _ = window.set_focus();
@@ -456,7 +448,8 @@ fn apply_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
 fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let show_item = MenuItem::with_id(app, "show", "Show Clipboard", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
-    let upgrade_item = MenuItem::with_id(app, "upgrade", "Upgrade to Pro — $5", true, None::<&str>)?;
+    let upgrade_item =
+        MenuItem::with_id(app, "upgrade", "Upgrade to Pro — $5", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit ctrl+", true, None::<&str>)?;
 
     let is_pro = app
@@ -467,7 +460,10 @@ fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu = if is_pro {
         Menu::with_items(app, &[&show_item, &settings_item, &quit_item])?
     } else {
-        Menu::with_items(app, &[&show_item, &settings_item, &upgrade_item, &quit_item])?
+        Menu::with_items(
+            app,
+            &[&show_item, &settings_item, &upgrade_item, &quit_item],
+        )?
     };
 
     let icon = app
@@ -527,6 +523,8 @@ fn setup_window(window: &WebviewWindow) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(state) = app.try_state::<AppState>() {
                 if let Err(error) = show_overlay(app, &state) {
@@ -595,27 +593,25 @@ pub fn run() {
                     let _ = window_util::position_overlay(&window, &position);
                 }
                 let handle = app.handle().clone();
-                window.on_window_event(move |event| {
-                    match event {
-                        WindowEvent::CloseRequested { api, .. } => {
-                            api.prevent_close();
-                            let _ = handle.get_webview_window("main").map(|window| {
-                                let _ = window.hide();
-                                window_util::hide_from_taskbar(&window);
-                            });
-                        }
-                        WindowEvent::Focused(false) => {
-                            let visible = handle
-                                .get_webview_window("main")
-                                .and_then(|window| window.is_visible().ok())
-                                .unwrap_or(false);
-
-                            if visible && should_hide_on_focus_loss(&handle) {
-                                let _ = hide_overlay_window(&handle);
-                            }
-                        }
-                        _ => {}
+                window.on_window_event(move |event| match event {
+                    WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = handle.get_webview_window("main").map(|window| {
+                            let _ = window.hide();
+                            window_util::hide_from_taskbar(&window);
+                        });
                     }
+                    WindowEvent::Focused(false) => {
+                        let visible = handle
+                            .get_webview_window("main")
+                            .and_then(|window| window.is_visible().ok())
+                            .unwrap_or(false);
+
+                        if visible && should_hide_on_focus_loss(&handle) {
+                            let _ = hide_overlay_window(&handle);
+                        }
+                    }
+                    _ => {}
                 });
             }
 

@@ -10,6 +10,7 @@ import {
 } from "../types";
 import { SelectField } from "./SelectField";
 import { UpgradePrompt } from "./UpgradePrompt";
+import { UpdateSection } from "./UpdateSection";
 
 interface SettingsProps {
   settings: AppSettings;
@@ -145,6 +146,8 @@ export function Settings({
             Clear history
           </button>
         </div>
+
+        <UpdateSection />
 
         <p className="settings-note">
           All clipboard data stays on your device. Nothing is uploaded.

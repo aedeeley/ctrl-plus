@@ -80,7 +80,8 @@ fn vertical_alignment(position: &str) -> VerticalAlignment {
     }
 }
 
-#[cfg(windows)]fn apply_windows_skip_taskbar(window: &WebviewWindow) {
+#[cfg(windows)]
+fn apply_windows_skip_taskbar(window: &WebviewWindow) {
     use std::ffi::c_void;
 
     const GWL_EXSTYLE: i32 = -20;

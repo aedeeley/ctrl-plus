@@ -163,12 +163,13 @@ pub fn load_license(db: &Database) -> Result<LicenseStatus, String> {
     Ok(status)
 }
 
-pub fn save_license(db: &Database, status: &LicenseStatus, token: Option<&str>) -> Result<(), String> {
+pub fn save_license(
+    db: &Database,
+    status: &LicenseStatus,
+    token: Option<&str>,
+) -> Result<(), String> {
     db.set_setting(LICENSE_TIER_SETTING, status.tier.as_str())?;
-    db.set_setting(
-        LICENSE_KEY_SETTING,
-        status.key.as_deref().unwrap_or(""),
-    )?;
+    db.set_setting(LICENSE_KEY_SETTING, status.key.as_deref().unwrap_or(""))?;
     db.set_setting(LICENSE_TOKEN_SETTING, token.unwrap_or(""))?;
     db.set_setting(
         LICENSE_ACTIVATED_AT_SETTING,
@@ -231,11 +232,7 @@ fn verify_token(token: &str, expected_key: Option<&str>) -> bool {
         .any(|secret| verify_token_with_secret(token, expected_key, secret))
 }
 
-fn verify_token_with_secret(
-    token: &str,
-    expected_key: Option<&str>,
-    secret: &str,
-) -> bool {
+fn verify_token_with_secret(token: &str, expected_key: Option<&str>, secret: &str) -> bool {
     let key = DecodingKey::from_secret(secret.as_bytes());
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;

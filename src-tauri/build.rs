@@ -1,7 +1,6 @@
 fn main() {
-    let secret = std::env::var("LICENSE_JWT_SECRET").unwrap_or_else(|_| {
-        "ctrl-plus-dev-jwt-secret-change-in-production".to_string()
-    });
+    let secret = std::env::var("LICENSE_JWT_SECRET")
+        .unwrap_or_else(|_| "ctrl-plus-dev-jwt-secret-change-in-production".to_string());
 
     #[cfg(not(debug_assertions))]
     if secret == "ctrl-plus-dev-jwt-secret-change-in-production" {

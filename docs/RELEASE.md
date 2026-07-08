@@ -108,6 +108,44 @@ To reduce warnings later:
 
 The release workflow is Windows-only today. Adding Mac/Linux later requires porting the Rust clipboard and paste code, then adding matrix rows to the workflow — the same tag-based release process will apply.
 
-## Future: auto-update
+## Auto-update
 
-The Tauri updater plugin can check GitHub Releases and prompt users to install new versions. Not configured yet.
+ctrl+ checks GitHub Releases for new versions. Users can tap **Check for updates** in Settings.
+
+### How it works
+
+1. Each release build signs updater artifacts (`.sig` files + `latest.json`).
+2. The app fetches `latest.json` from the latest GitHub release.
+3. If a newer version exists, the user can download and install it in-app. The app restarts automatically.
+
+### One-time setup (signing keys)
+
+Updater packages must be signed. Generate a keypair once (keep the private key secret):
+
+```powershell
+$env:CI = "true"
+npm run tauri signer generate -- -w "$env:USERPROFILE\.tauri\ctrl-plus.key" -f
+```
+
+The public key is already in `src-tauri/tauri.conf.json`. Add the **private** key as a GitHub Actions secret:
+
+| Secret | Value |
+|--------|-------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `%USERPROFILE%\.tauri\ctrl-plus.key` |
+
+```powershell
+Get-Content "$env:USERPROFILE\.tauri\ctrl-plus.key" -Raw
+```
+
+**Important:** If you lose the private key, you cannot ship updates to users who already have the app installed. Store it safely (password manager, etc.).
+
+If you regenerate keys, update the `pubkey` in `tauri.conf.json` to match the new `.pub` file.
+
+### Release checklist (with auto-update)
+
+Same as above, plus confirm the published release includes:
+
+- `latest.json`
+- `ctrl+_VERSION_x64-setup.exe.sig` (and ARM64 equivalent)
+
+These are created automatically when `TAURI_SIGNING_PRIVATE_KEY` is set in CI and `createUpdaterArtifacts` is enabled in `tauri.conf.json`.
