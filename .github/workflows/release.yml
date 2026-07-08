@@ -96,9 +96,9 @@ jobs:
 
             const body = [
               "## What's new",
-              "- Fix Pro license activation when server JWT secret differs from build default",
-              "- Accept legacy ctrlplus.pro JWT secret for existing deployments",
-              "- Add `npm run tauri:build:licensed` for local release builds",
+              "- Fix Pro license activation when ctrlplus.pro uses a JWT secret not embedded in the app",
+              "- Validate license token claims from the HTTPS activation response as a fallback",
+              "- Keep signature verification when build and server secrets match",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",

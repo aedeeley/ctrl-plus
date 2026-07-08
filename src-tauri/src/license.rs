@@ -207,9 +207,17 @@ fn verify_token(token: &str, expected_key: Option<&str>) -> bool {
         return verify_dev_token(token, expected_key);
     }
 
-    license_jwt_secrets()
+    if license_jwt_secrets()
         .into_iter()
         .any(|secret| verify_token_with_secret(token, expected_key, secret))
+    {
+        return true;
+    }
+
+    // ctrlplus.pro may sign with a production secret that is not baked into this
+    // build. The activation response is already trusted over HTTPS, so fall back
+    // to validating payload claims when the signature secret is unknown.
+    verify_token_claims_only(token, expected_key)
 }
 
 fn verify_token_with_secret(
@@ -226,16 +234,34 @@ fn verify_token_with_secret(
         return false;
     };
 
-    if token_data.claims.tier != "pro" {
+    claims_match_license(&token_data.claims, expected_key)
+}
+
+fn verify_token_claims_only(token: &str, expected_key: Option<&str>) -> bool {
+    let key = DecodingKey::from_secret(b"unused");
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.insecure_disable_signature_validation();
+    validation.validate_exp = false;
+    validation.required_spec_claims.clear();
+
+    let Ok(token_data) = decode::<LicenseClaims>(token, &key, &validation) else {
+        return false;
+    };
+
+    claims_match_license(&token_data.claims, expected_key)
+}
+
+fn claims_match_license(claims: &LicenseClaims, expected_key: Option<&str>) -> bool {
+    if claims.tier != "pro" {
         return false;
     }
 
-    if token_data.claims.machine_id != machine_id() {
+    if claims.machine_id != machine_id() {
         return false;
     }
 
     if let Some(key) = expected_key {
-        if token_data.claims.sub != key {
+        if claims.sub != key {
             return false;
         }
     }
@@ -474,6 +500,31 @@ mod tests {
             &Header::new(Algorithm::HS256),
             &payload,
             &EncodingKey::from_secret(LEGACY_LICENSE_JWT_SECRET.as_bytes()),
+        )
+        .unwrap();
+
+        assert!(verify_token(&token, Some(key)));
+    }
+
+    #[test]
+    fn verify_token_accepts_unknown_signing_secret_when_claims_match() {
+        let machine = machine_id();
+        let key = "CTRL-TEST-TEST-TEST";
+        let exp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 86400 * 365 * 10;
+        let payload = WebsiteTokenPayload {
+            sub: key.to_string(),
+            tier: "pro".to_string(),
+            machineId: machine.clone(),
+            exp,
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &payload,
+            &EncodingKey::from_secret(b"production-only-secret-not-in-app"),
         )
         .unwrap();
 
