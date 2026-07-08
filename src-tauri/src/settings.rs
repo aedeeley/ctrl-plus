@@ -10,7 +10,7 @@ pub const LIGHT_THEME: &str = "paper";
 pub const DARK_THEME: &str = "midnight";
 pub const DEFAULT_BORDER_STYLE: &str = "rounded";
 pub const DEFAULT_FONT_STYLE: &str = "system";
-pub const DEFAULT_OVERLAY_POSITION: &str = "center";
+pub const DEFAULT_SHADOW_STYLE: &str = "medium";
 
 pub const FREE_THEMES: &[&str] = &["midnight", "paper"];
 
@@ -23,7 +23,7 @@ pub struct AppSettings {
     pub theme: String,
     pub border_style: String,
     pub font_style: String,
-    pub overlay_position: String,
+    pub shadow_style: String,
 }
 
 impl Default for AppSettings {
@@ -35,7 +35,7 @@ impl Default for AppSettings {
             theme: DEFAULT_THEME.to_string(),
             border_style: DEFAULT_BORDER_STYLE.to_string(),
             font_style: DEFAULT_FONT_STYLE.to_string(),
-            overlay_position: DEFAULT_OVERLAY_POSITION.to_string(),
+            shadow_style: DEFAULT_SHADOW_STYLE.to_string(),
         }
     }
 }
@@ -83,9 +83,9 @@ impl AppSettings {
             }
         }
 
-        if let Some(value) = db.get_setting("overlay_position")? {
+        if let Some(value) = db.get_setting("shadow_style")? {
             if !value.is_empty() {
-                settings.overlay_position = value;
+                settings.shadow_style = value;
             }
         }
 
@@ -106,7 +106,7 @@ impl AppSettings {
         db.set_setting("theme", &self.theme)?;
         db.set_setting("border_style", &self.border_style)?;
         db.set_setting("font_style", &self.font_style)?;
-        db.set_setting("overlay_position", &self.overlay_position)?;
+        db.set_setting("shadow_style", &self.shadow_style)?;
         Ok(())
     }
 
@@ -127,7 +127,7 @@ impl AppSettings {
 
         self.border_style = DEFAULT_BORDER_STYLE.to_string();
         self.font_style = DEFAULT_FONT_STYLE.to_string();
-        self.overlay_position = DEFAULT_OVERLAY_POSITION.to_string();
+        self.shadow_style = DEFAULT_SHADOW_STYLE.to_string();
     }
 
     pub fn normalize_for_tier(&mut self, is_pro: bool) {
@@ -146,4 +146,34 @@ impl AppSettings {
             FREE_MAX_HISTORY
         }
     }
+}
+
+pub fn load_window_position(db: &crate::database::Database) -> Result<Option<(i32, i32)>, String> {
+    let x = db
+        .get_setting("window_x")?
+        .and_then(|value| value.parse::<i32>().ok());
+    let y = db
+        .get_setting("window_y")?
+        .and_then(|value| value.parse::<i32>().ok());
+
+    match (x, y) {
+        (Some(x), Some(y)) => Ok(Some((x, y))),
+        _ => Ok(None),
+    }
+}
+
+pub fn save_window_position(
+    db: &crate::database::Database,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    db.set_setting("window_x", &x.to_string())?;
+    db.set_setting("window_y", &y.to_string())?;
+    Ok(())
+}
+
+pub fn clear_window_position(db: &crate::database::Database) -> Result<(), String> {
+    db.set_setting("window_x", "")?;
+    db.set_setting("window_y", "")?;
+    Ok(())
 }

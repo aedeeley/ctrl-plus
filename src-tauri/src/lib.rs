@@ -12,7 +12,7 @@ use parking_lot::Mutex;
 use paste::{capture_paste_target, restore_and_paste, PasteTarget};
 use serde::Serialize;
 use settings::AppSettings;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::menu::{Menu, MenuItem};
@@ -29,6 +29,8 @@ struct AppState {
     last_paste_target: Mutex<Option<PasteTarget>>,
     settings: Mutex<AppSettings>,
     overlay_shown_at: Mutex<Option<Instant>>,
+    window_position: Mutex<Option<(i32, i32)>>,
+    is_dragging: AtomicBool,
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -227,7 +229,7 @@ fn update_settings(
         theme: settings.theme,
         border_style: settings.border_style,
         font_style: settings.font_style,
-        overlay_position: settings.overlay_position,
+        shadow_style: settings.shadow_style,
     };
     normalized.normalize_for_tier(is_pro);
 
@@ -240,12 +242,6 @@ fn update_settings(
     *state.settings.lock() = normalized.clone();
     apply_autostart(&app, normalized.launch_on_startup)?;
     register_hotkey(&app, &normalized.hotkey)?;
-
-    if let Some(window) = app.get_webview_window("main") {
-        if window.is_visible().unwrap_or(false) {
-            let _ = window_util::position_overlay(&window, &normalized.overlay_position);
-        }
-    }
 
     Ok(normalized)
 }
@@ -277,6 +273,55 @@ fn hide_overlay(app: AppHandle) -> Result<(), String> {
     hide_overlay_window(&app)
 }
 
+fn flush_window_position(state: &AppState, window: &WebviewWindow) {
+    if let Ok(position) = window.outer_position() {
+        let coords = (position.x, position.y);
+        *state.window_position.lock() = Some(coords);
+        if let Some(db) = state.db.try_lock() {
+            let _ = settings::save_window_position(&db, coords.0, coords.1);
+        }
+    }
+}
+
+#[tauri::command]
+fn start_window_drag(state: State<AppState>, app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window not found".to_string())?;
+
+    state.is_dragging.store(true, Ordering::SeqCst);
+    window
+        .start_dragging()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn end_window_drag(state: State<AppState>, app: AppHandle) -> Result<(), String> {
+    state.is_dragging.store(false, Ordering::SeqCst);
+
+    if let Some(window) = app.get_webview_window("main") {
+        flush_window_position(&state, &window);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn reset_window_position(state: State<AppState>, app: AppHandle) -> Result<(), String> {
+    *state.window_position.lock() = None;
+
+    {
+        let db = state.db.lock();
+        settings::clear_window_position(&db)?;
+    }
+
+    if let Some(window) = app.get_webview_window("main") {
+        window_util::position_overlay(&window, None)?;
+    }
+
+    Ok(())
+}
+
 fn show_overlay(app: &AppHandle, state: &AppState) -> Result<(), String> {
     let show_started = Instant::now();
 
@@ -291,8 +336,8 @@ fn show_overlay(app: &AppHandle, state: &AppState) -> Result<(), String> {
         .get_webview_window("main")
         .ok_or_else(|| "Main window not found".to_string())?;
 
-    let position = state.settings.lock().overlay_position.clone();
-    window_util::position_overlay(&window, &position)?;
+    let saved_position = *state.window_position.lock();
+    window_util::position_overlay(&window, saved_position)?;
     window.show().map_err(|e| e.to_string())?;
 
     let backend_ms = show_started.elapsed().as_secs_f64() * 1000.0;
@@ -482,10 +527,10 @@ fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "settings" => {
-                let _ = app.emit("open-settings", ());
                 if let Some(state) = app.try_state::<AppState>() {
                     let _ = show_overlay(app, &state);
                 }
+                let _ = app.emit("open-settings", ());
             }
             "upgrade" => {
                 let _ = app.opener().open_url(upgrade_url(), None::<&str>);
@@ -571,12 +616,19 @@ pub fn run() {
                 ignore_clipboard.clone(),
             )?;
 
+            let window_position = {
+                let db_guard = db.lock();
+                settings::load_window_position(&db_guard)?
+            };
+
             let state = AppState {
                 db,
                 ignore_clipboard,
                 last_paste_target: Mutex::new(None),
                 settings: Mutex::new(settings.clone()),
                 overlay_shown_at: Mutex::new(None),
+                window_position: Mutex::new(window_position),
+                is_dragging: AtomicBool::new(false),
             };
 
             app.manage(state);
@@ -589,8 +641,8 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 setup_window(&window);
                 if let Some(state) = app.try_state::<AppState>() {
-                    let position = state.settings.lock().overlay_position.clone();
-                    let _ = window_util::position_overlay(&window, &position);
+                    let saved_position = *state.window_position.lock();
+                    let _ = window_util::position_overlay(&window, saved_position);
                 }
                 let handle = app.handle().clone();
                 window.on_window_event(move |event| match event {
@@ -601,7 +653,30 @@ pub fn run() {
                             window_util::hide_from_taskbar(&window);
                         });
                     }
+                    WindowEvent::Moved(position) => {
+                        if let Some(state) = handle.try_state::<AppState>() {
+                            if state.is_dragging.load(Ordering::SeqCst) {
+                                *state.window_position.lock() =
+                                    Some((position.x, position.y));
+                            }
+                        }
+                    }
+                    WindowEvent::Focused(true) => {
+                        if let Some(state) = handle.try_state::<AppState>() {
+                            if state.is_dragging.swap(false, Ordering::SeqCst) {
+                                if let Some(window) = handle.get_webview_window("main") {
+                                    flush_window_position(&state, &window);
+                                }
+                            }
+                        }
+                    }
                     WindowEvent::Focused(false) => {
+                        if let Some(state) = handle.try_state::<AppState>() {
+                            if state.is_dragging.load(Ordering::SeqCst) {
+                                return;
+                            }
+                        }
+
                         let visible = handle
                             .get_webview_window("main")
                             .and_then(|window| window.is_visible().ok())
@@ -633,6 +708,9 @@ pub fn run() {
                     update_settings,
                     paste_item,
                     hide_overlay,
+                    start_window_drag,
+                    end_window_drag,
+                    reset_window_position,
                     get_license_status,
                     activate_license,
                     deactivate_license,
@@ -651,6 +729,9 @@ pub fn run() {
                     update_settings,
                     paste_item,
                     hide_overlay,
+                    start_window_drag,
+                    end_window_drag,
+                    reset_window_position,
                     get_license_status,
                     activate_license,
                     deactivate_license,

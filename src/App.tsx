@@ -6,8 +6,7 @@ import {
   shortcutIndexForKey,
 } from "./components/ClipboardList";
 import { Settings } from "./components/Settings";
-import { applyAppearance, getSystemPreferredTheme, normalizeBorder, normalizeFont, normalizeTheme } from "./themes";
-import { normalizeOverlayPosition } from "./positions";
+import { applyAppearance, getSystemPreferredTheme, normalizeBorder, normalizeFont, normalizeShadow, normalizeTheme } from "./themes";
 import { FREE_MAX_HISTORY, type AppSettings, type ClipboardItem, type LicenseStatus } from "./types";
 import "./App.css";
 
@@ -53,7 +52,7 @@ function App() {
       theme: normalizeTheme(nextSettings.theme),
       borderStyle: normalizeBorder(nextSettings.borderStyle),
       fontStyle: normalizeFont(nextSettings.fontStyle),
-      overlayPosition: normalizeOverlayPosition(nextSettings.overlayPosition),
+      shadowStyle: normalizeShadow(nextSettings.shadowStyle),
     });
   }, []);
 
@@ -90,6 +89,7 @@ function App() {
       settings.theme,
       settings.borderStyle,
       settings.fontStyle,
+      settings.shadowStyle,
     );
   }, [settings]);
 
@@ -142,6 +142,18 @@ function App() {
     await invoke("hide_overlay");
   }, []);
 
+  const endWindowDrag = useCallback(() => {
+    void invoke("end_window_drag");
+  }, []);
+
+  const startWindowDrag = useCallback(() => {
+    void invoke("start_window_drag");
+  }, []);
+
+  const recenterWindow = useCallback(() => {
+    void invoke("reset_window_position");
+  }, []);
+
   const saveSettings = useCallback(async (nextSettings: AppSettings) => {
     const saved = await invoke<AppSettings>("update_settings", {
       settings: nextSettings,
@@ -151,7 +163,7 @@ function App() {
       theme: normalizeTheme(saved.theme),
       borderStyle: normalizeBorder(saved.borderStyle),
       fontStyle: normalizeFont(saved.fontStyle),
-      overlayPosition: normalizeOverlayPosition(saved.overlayPosition),
+      shadowStyle: normalizeShadow(saved.shadowStyle),
     });
   }, []);
 
@@ -308,6 +320,7 @@ function App() {
           data-theme={bootTheme}
           data-border="rounded"
           data-font="system"
+          data-shadow="medium"
         >
           <p>Loading ctrl+...</p>
         </div>
@@ -323,6 +336,7 @@ function App() {
         data-theme={settings.theme}
         data-border={settings.borderStyle}
         data-font={settings.fontStyle}
+        data-shadow={settings.shadowStyle}
         onMouseDown={showSettings ? undefined : handleOverlayMouseDown}
       >
         <header
@@ -353,6 +367,40 @@ function App() {
             <span className="hotkey-hint">
               Press {settings.hotkey} to toggle
             </span>
+            <button
+              type="button"
+              className="icon-button header-move"
+              title="Move ctrl+ (click and hold to drag)"
+              aria-label="Move ctrl+ window"
+              onPointerDown={(event) => {
+                if (event.button !== 0) {
+                  return;
+                }
+                event.preventDefault();
+                startWindowDrag();
+              }}
+              onPointerUp={endWindowDrag}
+              onPointerLeave={endWindowDrag}
+              onPointerCancel={endWindowDrag}
+            >
+              <svg
+                className="icon-button-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 2v20" />
+                <path d="M2 12h20" />
+                <path d="M9 5l3-3 3 3" />
+                <path d="M9 19l3 3 3-3" />
+                <path d="M5 9l-3 3 3 3" />
+                <path d="M19 9l3 3-3 3" />
+              </svg>
+            </button>
             <button
               type="button"
               className="icon-button header-toggle"
@@ -410,6 +458,7 @@ function App() {
                 onClearHistory={() => {
                   void clearHistory();
                 }}
+                onRecenter={recenterWindow}
               />
             </div>
           ) : (
