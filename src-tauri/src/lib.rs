@@ -482,10 +482,10 @@ fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "settings" => {
-                let _ = app.emit("open-settings", ());
                 if let Some(state) = app.try_state::<AppState>() {
                     let _ = show_overlay(app, &state);
                 }
+                let _ = app.emit("open-settings", ());
             }
             "upgrade" => {
                 let _ = app.opener().open_url(upgrade_url(), None::<&str>);
