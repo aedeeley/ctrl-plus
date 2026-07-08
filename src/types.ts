@@ -15,6 +15,8 @@ export interface ClipboardItem {
   id: number;
   content: string;
   createdAt: number;
+  pinned: boolean;
+  sortOrder: number;
 }
 
 export interface AppSettings {
