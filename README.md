@@ -21,6 +21,14 @@ Get the latest installers from **[GitHub Releases](https://github.com/aedeeley/c
 
 Upgrade at **Settings → Upgrade** or at [ctrlplus.pro](https://ctrlplus.pro/#buy).
 
+## Source code and pricing
+
+This repository is **public for transparency**: you can read the code to confirm clipboard history stays on your device and is never uploaded. That does not make Pro free — honest users still buy a $5 license key to unlock Pro features and support development.
+
+- **Free tier** — fully usable without payment (5-item history, two themes)
+- **Pro ($5 one-time)** — license key from [ctrlplus.pro](https://ctrlplus.pro/#buy); works offline after activation
+- **Source** — public under [PolyForm Noncommercial](LICENSE) (audit the code; no commercial redistribution)
+
 ## Features
 
 - Background text clipboard monitoring
@@ -87,6 +95,8 @@ docs/                   Store, pricing, privacy, release guides
 - [docs/RELEASE.md](docs/RELEASE.md) — publish new versions to GitHub Releases
 - [docs/STORE.md](docs/STORE.md) — Microsoft Store publishing
 - [docs/PRICING.md](docs/PRICING.md) — freemium model
+- [docs/SECURITY.md](docs/SECURITY.md) — licensing security and public source notes
+- [docs/LICENSE-GUIDE.md](docs/LICENSE-GUIDE.md) — source license vs Pro product license
 
 ## Privacy
 
@@ -94,4 +104,4 @@ See [docs/PRIVACY.md](docs/PRIVACY.md). Clipboard data is stored only on your de
 
 ## License
 
-Proprietary — adjust before public release.
+Source code: [PolyForm Noncommercial 1.0.0](LICENSE). Installed app: free tier or Pro ($5 license key). See [docs/LICENSE-GUIDE.md](docs/LICENSE-GUIDE.md).

@@ -39,9 +39,19 @@ Draft releases are intentional — you can verify the files before making them p
    Without this secret, Pro license activation will not work in release builds.
    The value must match `LICENSE_JWT_SECRET` on ctrlplus.pro (Dokploy).
 
-   Early deployments used the placeholder `change-me-to-a-long-random-secret`; release
-   builds now also accept that legacy secret, but you should still align both sides
-   on one production value.
+   **Production requirement:** both sides must use the same long random secret.
+   The ctrlplus.pro server refuses to start in production if `LICENSE_JWT_SECRET` is
+   the dev default (`ctrl-plus-dev-jwt-secret-change-in-production`) or the legacy
+   placeholder (`change-me-to-a-long-random-secret`). Generate a new secret once,
+   set it in Dokploy and in this repo's GitHub Actions secret, then rebuild releases.
+
+   **Verify alignment (before shipping a release):**
+   1. In Dokploy → ctrlplus.pro env, confirm `LICENSE_JWT_SECRET` is set and is not a placeholder.
+   2. In GitHub → this repo → Settings → Secrets → `LICENSE_JWT_SECRET` matches Dokploy.
+   3. Purchase or use a test license key → activate in a release build → Pro unlocks offline.
+
+   Debug builds of the desktop app still accept legacy secrets for local development only;
+   release builds embed only the CI secret.
 
 ## Publishing a new version
 

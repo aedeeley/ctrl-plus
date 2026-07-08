@@ -3,6 +3,7 @@ name = "ctrl-plus"
 version = "0.1.8"
 description = "A lightweight multi-clipboard manager for Windows"
 authors = ["alexd"]
+license = "PolyForm-Noncommercial-1.0.0"
 edition = "2021"
 
 [lib]
