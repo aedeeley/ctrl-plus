@@ -9,25 +9,48 @@ permissions:
   contents: write
 
 jobs:
-  publish:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ""
-          - platform: windows-latest
-            args: "--target aarch64-pc-windows-msvc --bundles nsis"
-
-    runs-on: ${{ matrix.platform }}
-
+  build-x64:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        id: tauri
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LICENSE_JWT_SECRET: ${{ secrets.LICENSE_JWT_SECRET }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "ctrl+ ${{ github.ref_name }}"
+          releaseBody: "Draft release — publishing after all builds finish."
+          releaseDraft: true
+          prerelease: false
+
+    outputs:
+      release_id: ${{ steps.tauri.outputs.releaseId }}
+
+  build-arm64:
+    needs: build-x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
           cache: npm
 
       - name: Install Rust stable
@@ -43,16 +66,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LICENSE_JWT_SECRET: ${{ secrets.LICENSE_JWT_SECRET }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "ctrl+ ${{ github.ref_name }}"
-          releaseBody: "Draft release — publishing after all builds finish."
+          releaseId: ${{ needs.build-x64.outputs.release_id }}
           releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          args: "--target aarch64-pc-windows-msvc --bundles nsis"
 
   publish-release:
-    needs: publish
-    if: ${{ needs.publish.result == 'success' }}
+    needs: [build-x64, build-arm64]
+    if: ${{ needs.build-x64.outputs.release_id != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -62,48 +82,23 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const tag = context.ref.replace("refs/tags/", "");
+            const releaseId = Number("${{ needs.build-x64.outputs.release_id }}");
+            const tag = "${{ github.ref_name }}";
             const version = tag.replace(/^v/, "");
             const { owner, repo } = context.repo;
 
-            async function findRelease() {
-              try {
-                const { data } = await github.rest.repos.getReleaseByTag({
-                  owner,
-                  repo,
-                  tag,
-                });
-                return data;
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
-                }
-              }
-
-              const { data: releases } = await github.rest.repos.listReleases({
-                owner,
-                repo,
-                per_page: 30,
-              });
-
-              const release = releases.find(
-                (item) => item.tag_name === tag || item.name === `ctrl+ ${tag}`,
+            if (!releaseId) {
+              core.setFailed(
+                `No draft release was created for ${tag}. Check the build-x64 job logs and re-run the full workflow.`
               );
-
-              if (!release) {
-                throw new Error(`No draft release found for ${tag}`);
-              }
-
-              return release;
+              return;
             }
-
-            const release = await findRelease();
 
             const body = [
               "## What's new",
-              "- Fix Pro license activation (JWT verification)",
-              "- Add remove-from-device to free your license key",
-              "- Free tier stays locked until activation",
+              "- Fix Pro license activation when server JWT secret differs from build default",
+              "- Accept legacy ctrlplus.pro JWT secret for existing deployments",
+              "- Add `npm run tauri:build:licensed` for local release builds",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",
@@ -114,8 +109,7 @@ jobs:
             await github.rest.repos.updateRelease({
               owner,
               repo,
-              release_id: release.id,
-              tag_name: tag,
+              release_id: releaseId,
               name: "ctrl+ " + tag,
               body,
               draft: false,

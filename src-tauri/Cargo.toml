@@ -1,6 +1,6 @@
 [package]
 name = "ctrl-plus"
-version = "0.1.4"
+version = "0.1.5"
 description = "A lightweight multi-clipboard manager for Windows"
 authors = ["alexd"]
 edition = "2021"

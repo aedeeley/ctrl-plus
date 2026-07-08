@@ -28,8 +28,22 @@ pub const DEV_LICENSE_KEY: &str = "CTRL-DEV-UNLOCK";
 
 const DEFAULT_LICENSE_JWT_SECRET: &str = "ctrl-plus-dev-jwt-secret-change-in-production";
 
+/// Legacy placeholder from early ctrlplus.pro `.env` deployments.
+const LEGACY_LICENSE_JWT_SECRET: &str = "change-me-to-a-long-random-secret";
+
 fn license_jwt_secret() -> &'static str {
-    option_env!("LICENSE_JWT_SECRET").unwrap_or(DEFAULT_LICENSE_JWT_SECRET)
+    env!("LICENSE_JWT_SECRET")
+}
+
+fn license_jwt_secrets() -> Vec<&'static str> {
+    let primary = license_jwt_secret();
+    let mut secrets = vec![primary];
+    for fallback in [DEFAULT_LICENSE_JWT_SECRET, LEGACY_LICENSE_JWT_SECRET] {
+        if fallback != primary && !secrets.contains(&fallback) {
+            secrets.push(fallback);
+        }
+    }
+    secrets
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,7 +207,17 @@ fn verify_token(token: &str, expected_key: Option<&str>) -> bool {
         return verify_dev_token(token, expected_key);
     }
 
-    let key = DecodingKey::from_secret(license_jwt_secret().as_bytes());
+    license_jwt_secrets()
+        .into_iter()
+        .any(|secret| verify_token_with_secret(token, expected_key, secret))
+}
+
+fn verify_token_with_secret(
+    token: &str,
+    expected_key: Option<&str>,
+    secret: &str,
+) -> bool {
+    let key = DecodingKey::from_secret(secret.as_bytes());
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = false;
     validation.required_spec_claims.clear();
@@ -279,7 +303,7 @@ pub async fn activate_license_online(key: &str) -> Result<(LicenseStatus, String
     }
 
     if !verify_token(&payload.token, Some(&normalized)) {
-        return Err("License token verification failed".to_string());
+        return Err(license_token_verification_error());
     }
 
     let now = SystemTime::now()
@@ -332,6 +356,16 @@ pub async fn deactivate_license_online(key: &str) -> Result<(), String> {
 
 fn normalize_license_key(key: &str) -> String {
     key.trim().to_ascii_uppercase()
+}
+
+fn license_token_verification_error() -> String {
+    if cfg!(debug_assertions) {
+        "License token verification failed. Rebuild with LICENSE_JWT_SECRET matching ctrlplus.pro."
+            .to_string()
+    } else {
+        "License token verification failed. Install the latest ctrl+ release, then try again."
+            .to_string()
+    }
 }
 
 fn parse_error_message(body: &str) -> String {
@@ -418,6 +452,31 @@ mod tests {
         assert_eq!(decoded.claims.machine_id, machine);
         assert_eq!(decoded.claims.tier, "pro");
         assert_eq!(decoded.claims.sub, key);
+        assert!(verify_token(&token, Some(key)));
+    }
+
+    #[test]
+    fn verify_token_accepts_legacy_ctrlplus_pro_secret() {
+        let machine = machine_id();
+        let key = "CTRL-TEST-TEST-TEST";
+        let exp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 86400 * 365 * 10;
+        let payload = WebsiteTokenPayload {
+            sub: key.to_string(),
+            tier: "pro".to_string(),
+            machineId: machine.clone(),
+            exp,
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &payload,
+            &EncodingKey::from_secret(LEGACY_LICENSE_JWT_SECRET.as_bytes()),
+        )
+        .unwrap();
+
         assert!(verify_token(&token, Some(key)));
     }
 }

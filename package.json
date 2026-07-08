@@ -1,7 +1,7 @@
 {
   "name": "ctrl-plus",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:licensed": "node scripts/with-license-env.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

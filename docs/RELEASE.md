@@ -37,6 +37,11 @@ Draft releases are intentional — you can verify the files before making them p
    - Value: same JWT secret as your production license server at `ctrlplus.pro`
 
    Without this secret, Pro license activation will not work in release builds.
+   The value must match `LICENSE_JWT_SECRET` on ctrlplus.pro (Dokploy).
+
+   Early deployments used the placeholder `change-me-to-a-long-random-secret`; release
+   builds now also accept that legacy secret, but you should still align both sides
+   on one production value.
 
 ## Publishing a new version
 
@@ -78,8 +83,12 @@ To build installers on your machine instead of CI:
 
 ```bash
 npm install
-npm run tauri:build
+npm run tauri:build:licensed
 ```
+
+If `../ctrlplus.pro/.env` exists, `tauri:build:licensed` copies its
+`LICENSE_JWT_SECRET` into the build automatically. Otherwise set the env var
+yourself before `npm run tauri:build`.
 
 Output:
 

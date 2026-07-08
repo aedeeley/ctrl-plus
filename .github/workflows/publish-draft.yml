@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag to publish
         required: true
-        default: v0.1.3
+        default: v0.1.5
 
 permissions:
   contents: write
@@ -23,44 +23,44 @@ jobs:
             const version = tag.replace(/^v/, "");
             const { owner, repo } = context.repo;
 
-            async function findRelease() {
-              try {
-                const { data } = await github.rest.repos.getReleaseByTag({
-                  owner,
-                  repo,
-                  tag,
-                });
-                return data;
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
+            async function getDraftRelease() {
+              const maxAttempts = 6;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  const { data } = await github.rest.repos.getReleaseByTag({
+                    owner,
+                    repo,
+                    tag,
+                  });
+                  return data;
+                } catch (error) {
+                  if (error.status !== 404 || attempt === maxAttempts) {
+                    throw error;
+                  }
+                  core.info(`Draft release not found yet (attempt ${attempt}/${maxAttempts}), retrying...`);
+                  await new Promise((resolve) => setTimeout(resolve, 10000));
                 }
               }
-
-              const { data: releases } = await github.rest.repos.listReleases({
-                owner,
-                repo,
-                per_page: 30,
-              });
-
-              const release = releases.find(
-                (item) => item.tag_name === tag || item.name === `ctrl+ ${tag}`,
-              );
-
-              if (!release) {
-                throw new Error(`No draft release found for ${tag}`);
-              }
-
-              return release;
             }
 
-            const release = await findRelease();
+            let release;
+            try {
+              release = await getDraftRelease();
+            } catch (error) {
+              if (error.status === 404) {
+                core.setFailed(
+                  `No release exists for tag ${tag}. Run the Release workflow first so tauri-action can create a draft with build artifacts.`
+                );
+                return;
+              }
+              throw error;
+            }
 
             const body = [
               "## What's new",
-              "- Fix Pro license activation (JWT verification)",
-              "- Add remove-from-device to free your license key",
-              "- Free tier stays locked until activation",
+              "- Fix Pro license activation when server JWT secret differs from build default",
+              "- Accept legacy ctrlplus.pro JWT secret for existing deployments",
+              "- Add `npm run tauri:build:licensed` for local release builds",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",
@@ -72,7 +72,6 @@ jobs:
               owner,
               repo,
               release_id: release.id,
-              tag_name: tag,
               name: "ctrl+ " + tag,
               body,
               draft: false,
