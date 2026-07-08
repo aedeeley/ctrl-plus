@@ -4,20 +4,33 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[cfg(debug_assertions)]
-pub const UPGRADE_URL: &str = "http://localhost:3000/#buy";
-#[cfg(not(debug_assertions))]
-pub const UPGRADE_URL: &str = "https://ctrlplus.pro/#buy";
+/// Base URL of the license server.
+///
+/// Defaults to the production server (`https://ctrlplus.pro`) for both debug and
+/// release builds so activation works against the online server out of the box.
+/// To test against a local server, set the `CTRL_LICENSE_BASE_URL` environment
+/// variable (e.g. `http://localhost:3000`).
+pub fn license_base_url() -> String {
+    if let Ok(base) = std::env::var("CTRL_LICENSE_BASE_URL") {
+        let trimmed = base.trim().trim_end_matches('/');
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    "https://ctrlplus.pro".to_string()
+}
 
-#[cfg(debug_assertions)]
-pub const LICENSE_API_URL: &str = "http://localhost:3000/api/activate";
-#[cfg(not(debug_assertions))]
-pub const LICENSE_API_URL: &str = "https://ctrlplus.pro/api/activate";
+pub fn upgrade_url() -> String {
+    format!("{}/#buy", license_base_url())
+}
 
-#[cfg(debug_assertions)]
-pub const LICENSE_DEACTIVATE_API_URL: &str = "http://localhost:3000/api/deactivate";
-#[cfg(not(debug_assertions))]
-pub const LICENSE_DEACTIVATE_API_URL: &str = "https://ctrlplus.pro/api/deactivate";
+pub fn license_api_url() -> String {
+    format!("{}/api/activate", license_base_url())
+}
+
+pub fn license_deactivate_api_url() -> String {
+    format!("{}/api/deactivate", license_base_url())
+}
 
 pub const LICENSE_KEY_SETTING: &str = "license_key";
 pub const LICENSE_TIER_SETTING: &str = "license_tier";
@@ -308,7 +321,7 @@ pub async fn activate_license_online(key: &str) -> Result<(LicenseStatus, String
     };
 
     let response = client
-        .post(LICENSE_API_URL)
+        .post(license_api_url())
         .json(&body)
         .send()
         .await
@@ -366,7 +379,7 @@ pub async fn deactivate_license_online(key: &str) -> Result<(), String> {
     };
 
     let response = client
-        .post(LICENSE_DEACTIVATE_API_URL)
+        .post(license_deactivate_api_url())
         .json(&body)
         .send()
         .await

@@ -7,7 +7,7 @@ mod window_util;
 
 use clipboard::set_clipboard_suppressed;
 use database::{ClipboardItem, Database};
-use license::{LicenseStatus, UPGRADE_URL};
+use license::{upgrade_url, LicenseStatus};
 use parking_lot::Mutex;
 use paste::{capture_paste_target, restore_and_paste, PasteTarget};
 use serde::Serialize;
@@ -201,7 +201,7 @@ fn unlock_dev_pro(state: State<AppState>, app: AppHandle) -> Result<LicenseStatu
 #[tauri::command]
 fn open_upgrade_page(app: AppHandle) -> Result<(), String> {
     app.opener()
-        .open_url(UPGRADE_URL, None::<&str>)
+        .open_url(upgrade_url(), None::<&str>)
         .map_err(|e| e.to_string())
 }
 
@@ -488,7 +488,7 @@ fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "upgrade" => {
-                let _ = app.opener().open_url(UPGRADE_URL, None::<&str>);
+                let _ = app.opener().open_url(upgrade_url(), None::<&str>);
             }
             "quit" => {
                 app.exit(0);
