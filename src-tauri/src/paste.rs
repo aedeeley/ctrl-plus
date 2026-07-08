@@ -13,12 +13,11 @@ mod platform {
     use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, SetFocus, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
-        KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_LSHIFT, VK_MENU, VK_RSHIFT, VK_SHIFT,
-        VK_V,
+        KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_LSHIFT, VK_MENU, VK_RSHIFT, VK_SHIFT, VK_V,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         GetClassNameW, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, IsWindow,
-        SendMessageW, SetForegroundWindow, ShowWindow, GUITHREADINFO, SW_RESTORE, WM_PASTE,
+        SendMessageW, SetForegroundWindow, ShowWindow, GUITHREADINFO, SW_RESTORE,
     };
 
     const EM_REPLACESEL: u32 = 0x00C2;
@@ -41,13 +40,12 @@ mod platform {
                 ..Default::default()
             };
 
-            let focus = if GetGUIThreadInfo(thread_id, &mut info).is_ok()
-                && !info.hwndFocus.0.is_null()
-            {
-                Some(info.hwndFocus.0 as isize)
-            } else {
-                None
-            };
+            let focus =
+                if GetGUIThreadInfo(thread_id, &mut info).is_ok() && !info.hwndFocus.0.is_null() {
+                    Some(info.hwndFocus.0 as isize)
+                } else {
+                    None
+                };
 
             PasteTarget {
                 foreground: Some(foreground_value),
@@ -65,6 +63,11 @@ mod platform {
 
         let foreground = HWND(foreground_value as *mut _);
         let focus = target.focus.map(|value| HWND(value as *mut _));
+
+        // Tracks whether the text was already inserted through a native control message.
+        // If so, we must NOT also simulate a keyboard paste, otherwise the content is
+        // pasted twice. Exactly one paste mechanism is allowed to run per call.
+        let mut pasted = false;
 
         unsafe {
             if !IsWindow(foreground).as_bool() {
@@ -89,15 +92,13 @@ mod platform {
                 let _ = SetFocus(focus_hwnd);
                 thread::sleep(Duration::from_millis(40));
 
-                if is_native_text_input(focus_hwnd) && replace_selection(focus_hwnd, text) {
-                    if attached {
-                        let _ = AttachThreadInput(current_thread, target_thread, false);
-                    }
-                    return Ok(());
+                // Native Win32 edit/richedit controls accept a direct text insertion,
+                // which is the most reliable path and never involves the clipboard or
+                // synthesized keystrokes.
+                if is_native_text_input(focus_hwnd) {
+                    replace_selection(focus_hwnd, text);
+                    pasted = true;
                 }
-
-                SendMessageW(focus_hwnd, WM_PASTE, WPARAM(0), LPARAM(0));
-                thread::sleep(Duration::from_millis(30));
             }
 
             if attached {
@@ -105,6 +106,14 @@ mod platform {
             }
         }
 
+        if pasted {
+            return Ok(());
+        }
+
+        // Every non-native target (Chromium/Electron/browsers/modern UI frameworks)
+        // is pasted via a single simulated Ctrl+V. The previous WM_PASTE message was
+        // removed because it double-pasted in apps that honor both WM_PASTE and the
+        // synthesized keystroke.
         paste_via_keyboard(text)
     }
 
@@ -191,7 +200,11 @@ mod platform {
                 ki: KEYBDINPUT {
                     wVk: vk,
                     wScan: 0,
-                    dwFlags: if key_up { KEYEVENTF_KEYUP } else { Default::default() },
+                    dwFlags: if key_up {
+                        KEYEVENTF_KEYUP
+                    } else {
+                        Default::default()
+                    },
                     time: 0,
                     dwExtraInfo: 0,
                 },
