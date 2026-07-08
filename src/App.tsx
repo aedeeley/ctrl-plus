@@ -160,6 +160,32 @@ function App() {
     await loadHistory();
   }, [loadHistory]);
 
+  const handleTogglePin = useCallback(
+    async (item: ClipboardItem) => {
+      try {
+        await invoke("toggle_pin", { id: item.id });
+        await loadHistory();
+      } catch (error) {
+        console.error("Failed to toggle pin:", error);
+      }
+    },
+    [loadHistory],
+  );
+
+  const handleReorder = useCallback(
+    async (orderedIds: number[]) => {
+      setItems((current) => {
+        const byId = new Map(current.map((entry) => [entry.id, entry]));
+        return orderedIds
+          .map((id) => byId.get(id))
+          .filter((entry): entry is ClipboardItem => entry !== undefined);
+      });
+      await invoke("reorder_items", { orderedIds });
+      await loadHistory();
+    },
+    [loadHistory],
+  );
+
   const activeIndex = hoveredIndex ?? selectedIndex;
 
   const pasteActiveItem = useCallback(() => {
@@ -176,7 +202,7 @@ function App() {
       }
 
       const target = event.target as HTMLElement;
-      if (target.closest("button, input, select, textarea, a, label, .select-menu, .select-field")) {
+      if (target.closest("button, input, select, textarea, a, label, .select-menu, .select-field, .item-drag-handle, .item-pin-button")) {
         return;
       }
 
@@ -423,10 +449,18 @@ function App() {
                   hoveredIndex={hoveredIndex}
                   showShortcuts={searchIsEmpty}
                   maxShortcuts={maxShortcuts}
+                  isPro={isPro}
+                  canReorder={isPro && searchIsEmpty}
                   onHoverIndexChange={setHoveredIndex}
                   onSelect={setSelectedIndex}
                   onPaste={(item) => {
                     void pasteItem(item);
+                  }}
+                  onTogglePin={(item) => {
+                    void handleTogglePin(item);
+                  }}
+                  onReorder={(orderedIds) => {
+                    void handleReorder(orderedIds);
                   }}
                 />
 
