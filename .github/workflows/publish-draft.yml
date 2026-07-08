@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag to publish
         required: true
-        default: v0.1.2
+        default: v0.1.3
 
 permissions:
   contents: write
@@ -22,11 +22,39 @@ jobs:
             const tag = "${{ inputs.tag }}";
             const version = tag.replace(/^v/, "");
             const { owner, repo } = context.repo;
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner,
-              repo,
-              tag,
-            });
+
+            async function findRelease() {
+              try {
+                const { data } = await github.rest.repos.getReleaseByTag({
+                  owner,
+                  repo,
+                  tag,
+                });
+                return data;
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+
+              const { data: releases } = await github.rest.repos.listReleases({
+                owner,
+                repo,
+                per_page: 30,
+              });
+
+              const release = releases.find(
+                (item) => item.tag_name === tag || item.name === `ctrl+ ${tag}`,
+              );
+
+              if (!release) {
+                throw new Error(`No draft release found for ${tag}`);
+              }
+
+              return release;
+            }
+
+            const release = await findRelease();
 
             const body = [
               "## What's new",
@@ -44,6 +72,7 @@ jobs:
               owner,
               repo,
               release_id: release.id,
+              tag_name: tag,
               name: "ctrl+ " + tag,
               body,
               draft: false,
