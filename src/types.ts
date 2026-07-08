@@ -1,5 +1,4 @@
-import type { BorderStyle, FontStyle, ThemeId } from "./themes";
-import type { OverlayPosition } from "./positions";
+import type { BorderStyle, FontStyle, ShadowStyle, ThemeId } from "./themes";
 
 export type LicenseTier = "free" | "pro";
 
@@ -26,7 +25,7 @@ export interface AppSettings {
   theme: ThemeId;
   borderStyle: BorderStyle;
   fontStyle: FontStyle;
-  overlayPosition: OverlayPosition;
+  shadowStyle: ShadowStyle;
 }
 
 export const HOTKEY_OPTIONS = [

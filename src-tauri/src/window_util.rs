@@ -14,9 +14,33 @@ pub fn hide_from_taskbar(window: &WebviewWindow) {
     apply_windows_skip_taskbar(window);
 }
 
-pub fn position_overlay(window: &WebviewWindow, position: &str) -> Result<(), String> {
-    const MARGIN: i32 = 24;
+pub fn position_overlay(window: &WebviewWindow, saved: Option<(i32, i32)>) -> Result<(), String> {
+    if let Some((x, y)) = saved {
+        if position_is_on_monitor(window, x, y)? {
+            return window
+                .set_position(PhysicalPosition::new(x, y))
+                .map_err(|error| error.to_string());
+        }
+    }
 
+    center_overlay(window)
+}
+
+fn position_is_on_monitor(window: &WebviewWindow, x: i32, y: i32) -> Result<bool, String> {
+    let monitors = window
+        .available_monitors()
+        .map_err(|error| error.to_string())?;
+
+    Ok(monitors.iter().any(|monitor| {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let right = pos.x + size.width as i32;
+        let bottom = pos.y + size.height as i32;
+        x >= pos.x && x < right && y >= pos.y && y < bottom
+    }))
+}
+
+fn center_overlay(window: &WebviewWindow) -> Result<(), String> {
     let monitor = window
         .current_monitor()
         .map_err(|error| error.to_string())?
@@ -27,57 +51,12 @@ pub fn position_overlay(window: &WebviewWindow, position: &str) -> Result<(), St
     let monitor_size = monitor.size();
     let window_size = window.outer_size().map_err(|error| error.to_string())?;
 
-    let monitor_width = monitor_size.width as i32;
-    let monitor_height = monitor_size.height as i32;
-    let window_width = window_size.width as i32;
-    let window_height = window_size.height as i32;
-
-    let x_offset = match horizontal_alignment(position) {
-        HorizontalAlignment::Start => MARGIN,
-        HorizontalAlignment::Center => (monitor_width - window_width) / 2,
-        HorizontalAlignment::End => monitor_width - window_width - MARGIN,
-    };
-
-    let y_offset = match vertical_alignment(position) {
-        VerticalAlignment::Start => MARGIN,
-        VerticalAlignment::Center => (monitor_height - window_height) / 2,
-        VerticalAlignment::End => monitor_height - window_height - MARGIN,
-    };
-
-    let x = monitor_pos.x + x_offset;
-    let y = monitor_pos.y + y_offset;
+    let x = monitor_pos.x + (monitor_size.width as i32 - window_size.width as i32) / 2;
+    let y = monitor_pos.y + (monitor_size.height as i32 - window_size.height as i32) / 2;
 
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|error| error.to_string())
-}
-
-enum HorizontalAlignment {
-    Start,
-    Center,
-    End,
-}
-
-enum VerticalAlignment {
-    Start,
-    Center,
-    End,
-}
-
-fn horizontal_alignment(position: &str) -> HorizontalAlignment {
-    match position {
-        "top-left" | "left" | "bottom-left" => HorizontalAlignment::Start,
-        "top-right" | "right" | "bottom-right" => HorizontalAlignment::End,
-        _ => HorizontalAlignment::Center,
-    }
-}
-
-fn vertical_alignment(position: &str) -> VerticalAlignment {
-    match position {
-        "top-left" | "top" | "top-right" => VerticalAlignment::Start,
-        "bottom-left" | "bottom" | "bottom-right" => VerticalAlignment::End,
-        _ => VerticalAlignment::Center,
-    }
 }
 
 #[cfg(windows)]

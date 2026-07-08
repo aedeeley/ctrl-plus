@@ -8,6 +8,32 @@ interface UpgradePromptProps {
   onSettingsRefresh: () => void;
 }
 
+const PRO_FEATURES = [
+  "Up to 5,000 clipboard items",
+  "24 themes including AMOLED & high-contrast",
+  "7 border radius styles",
+  "7 font options",
+  "Pin and reorder clips",
+  "Number hotkeys 1–9",
+] as const;
+
+function CheckIcon() {
+  return (
+    <svg
+      className="pro-feature-check"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 8.5l3 3 7-7" />
+    </svg>
+  );
+}
+
 export function UpgradePrompt({
   license,
   onLicenseChange,
@@ -36,11 +62,21 @@ export function UpgradePrompt({
     };
 
     return (
-      <div className="upgrade-banner pro-active">
-        <div className="upgrade-pro-header">
-          <span>Pro unlocked</span>
-          {license.key && <span className="upgrade-key">{license.key}</span>}
+      <div className="pro-panel pro-panel-active">
+        <div className="pro-panel-hero">
+          <div className="pro-panel-badge">Pro active</div>
+          <h2 className="pro-panel-title">ctrl+ pro</h2>
+          <p className="pro-panel-subtitle">All features unlocked on this device.</p>
         </div>
+        <ul className="pro-feature-list">
+          {PRO_FEATURES.map((feature) => (
+            <li key={feature}>
+              <CheckIcon />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+        {license.key && <span className="upgrade-key">{license.key}</span>}
         {confirming ? (
           <div className="upgrade-deactivate-confirm">
             <span>
@@ -112,14 +148,26 @@ export function UpgradePrompt({
   };
 
   return (
-    <div className="upgrade-banner">
-      <div className="upgrade-copy">
-        <strong>Upgrade to Pro — $5</strong>
-        <span>Unlimited history, all themes, borders, fonts, and popup position.</span>
+    <div className="pro-panel">
+      <div className="pro-panel-hero">
+        <div className="pro-panel-badge locked">Upgrade</div>
+        <h2 className="pro-panel-title">ctrl+ pro</h2>
+        <p className="pro-panel-price">$5 one-time</p>
+        <p className="pro-panel-subtitle">
+          Unlock the full clipboard experience. Pay once, keep forever.
+        </p>
       </div>
+      <ul className="pro-feature-list">
+        {PRO_FEATURES.map((feature) => (
+          <li key={feature}>
+            <CheckIcon />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
       <div className="upgrade-actions">
         <button type="button" className="upgrade-button" onClick={handleUpgrade}>
-          Upgrade
+          Upgrade to Pro
         </button>
         <button
           type="button"
