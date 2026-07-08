@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { LicenseStatus } from "../types";
 
@@ -39,11 +39,22 @@ export function UpgradePrompt({
   onLicenseChange,
   onSettingsRefresh,
 }: UpgradePromptProps) {
-  const [key, setKey] = useState("");
-  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [key, setKey] = useState(license.key ?? "");
+  const [showKeyInput, setShowKeyInput] = useState(Boolean(license.key));
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (license.tier === "pro") {
+      return;
+    }
+
+    if (license.key) {
+      setKey(license.key);
+      setShowKeyInput(true);
+    }
+  }, [license.key, license.tier]);
 
   if (license.tier === "pro") {
     const handleDeactivate = async () => {

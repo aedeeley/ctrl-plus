@@ -98,8 +98,8 @@ jobs:
 
             const body = [
               "## What's new",
-              "- Near-instant paste: replaced fixed timing delays with adaptive foreground detection, cutting paste latency from ~270-320ms down to roughly 10-70ms",
-              "- Snappier overlay: memoized the clipboard list so hovering, searching, and arrow navigation no longer re-render and re-format every row",
+              "- Pro license now survives updates: the app stores a stable device ID and automatically re-validates your saved key on launch, so you no longer have to re-enter your activation key after updating",
+              "- Settings pre-fills your saved license key if online re-activation can't reach the server, so restoring Pro is a single click",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",

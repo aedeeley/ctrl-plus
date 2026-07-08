@@ -2,6 +2,7 @@ use crate::database::Database;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Base URL of the license server.
@@ -36,6 +37,9 @@ pub const LICENSE_KEY_SETTING: &str = "license_key";
 pub const LICENSE_TIER_SETTING: &str = "license_tier";
 pub const LICENSE_TOKEN_SETTING: &str = "license_token";
 pub const LICENSE_ACTIVATED_AT_SETTING: &str = "license_activated_at";
+pub const MACHINE_ID_SETTING: &str = "machine_id";
+
+static CACHED_MACHINE_ID: OnceLock<String> = OnceLock::new();
 
 #[cfg(debug_assertions)]
 pub const DEV_LICENSE_KEY: &str = "CTRL-DEV-UNLOCK";
@@ -133,7 +137,41 @@ struct LicenseClaims {
     exp: u64,
 }
 
-pub fn machine_id() -> String {
+/// Load or create a stable machine identifier for license binding.
+///
+/// Persisted in the settings DB so token verification survives app updates and
+/// relaunches where environment variables may be temporarily unavailable.
+pub fn init_machine_id(db: &Database) -> Result<(), String> {
+    if CACHED_MACHINE_ID.get().is_some() {
+        return Ok(());
+    }
+
+    let id = if let Some(stored) = db.get_setting(MACHINE_ID_SETTING)? {
+        if !stored.is_empty() {
+            stored
+        } else {
+            resolve_machine_id(db)?
+        }
+    } else {
+        resolve_machine_id(db)?
+    };
+
+    db.set_setting(MACHINE_ID_SETTING, &id)?;
+    let _ = CACHED_MACHINE_ID.set(id);
+    Ok(())
+}
+
+fn resolve_machine_id(db: &Database) -> Result<String, String> {
+    if let Ok(Some(token)) = db.get_setting(LICENSE_TOKEN_SETTING) {
+        if let Some(id) = extract_machine_id_from_token(&token) {
+            return Ok(id);
+        }
+    }
+
+    Ok(compute_machine_id_from_env())
+}
+
+fn compute_machine_id_from_env() -> String {
     let mut hasher = Sha256::new();
     if let Ok(name) = std::env::var("COMPUTERNAME") {
         hasher.update(name.as_bytes());
@@ -143,6 +181,73 @@ pub fn machine_id() -> String {
     }
     hasher.update(b"ctrl-plus-v1");
     hex::encode(hasher.finalize())
+}
+
+pub fn machine_id() -> String {
+    CACHED_MACHINE_ID
+        .get()
+        .cloned()
+        .unwrap_or_else(compute_machine_id_from_env)
+}
+
+fn extract_machine_id_from_token(token: &str) -> Option<String> {
+    if token.is_empty() {
+        return None;
+    }
+
+    if token.starts_with("dev.") {
+        let payload = token.strip_prefix("dev.")?;
+        let parts: Vec<&str> = payload.split('.').collect();
+        if parts.len() == 3 && !parts[1].is_empty() {
+            return Some(parts[1].to_string());
+        }
+        return None;
+    }
+
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.insecure_disable_signature_validation();
+    validation.validate_exp = false;
+    validation.required_spec_claims.clear();
+
+    let key = DecodingKey::from_secret(b"unused");
+    decode::<LicenseClaims>(token, &key, &validation)
+        .ok()
+        .map(|token_data| token_data.claims.machine_id)
+        .filter(|id| !id.is_empty())
+}
+
+/// Returns true when a license key is stored but the signed token is missing or invalid.
+pub fn needs_license_refresh(db: &Database) -> bool {
+    let Ok(Some(key)) = db.get_setting(LICENSE_KEY_SETTING) else {
+        return false;
+    };
+    if key.is_empty() {
+        return false;
+    }
+
+    let Ok(token) = db.get_setting(LICENSE_TOKEN_SETTING) else {
+        return true;
+    };
+
+    match token.filter(|value| !value.is_empty()) {
+        Some(token) => !verify_token(&token, Some(&key)),
+        None => true,
+    }
+}
+
+/// Re-activate using the stored license key when the local JWT is missing or stale.
+pub async fn refresh_stored_license(key: &str) -> Result<(LicenseStatus, String), String> {
+    let normalized = normalize_license_key(key);
+    if normalized.is_empty() {
+        return Err("License key is required".to_string());
+    }
+
+    #[cfg(debug_assertions)]
+    if is_dev_license_key(&normalized) {
+        return activate_dev_license();
+    }
+
+    activate_license_online(&normalized).await
 }
 
 pub fn load_license(db: &Database) -> Result<LicenseStatus, String> {
@@ -545,6 +650,34 @@ mod tests {
         .unwrap();
 
         assert!(!verify_token(&token, Some(key)));
+    }
+
+    #[test]
+    fn extract_machine_id_from_jwt_payload() {
+        let machine = compute_machine_id_from_env();
+        let key = "CTRL-TEST-TEST-TEST";
+        let exp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 86400;
+        let payload = WebsiteTokenPayload {
+            sub: key.to_string(),
+            tier: "pro".to_string(),
+            machineId: machine.clone(),
+            exp,
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &payload,
+            &EncodingKey::from_secret(license_jwt_secret().as_bytes()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            extract_machine_id_from_token(&token).as_deref(),
+            Some(machine.as_str())
+        );
     }
 
     #[test]

@@ -175,6 +175,30 @@ fn apply_pro_activation(
     Ok(status)
 }
 
+async fn refresh_license_on_startup(state: &AppState, app: &AppHandle) {
+    let key = {
+        let db = state.db.lock();
+        if !license::needs_license_refresh(&db) {
+            return;
+        }
+        match db.get_setting(license::LICENSE_KEY_SETTING) {
+            Ok(Some(key)) if !key.is_empty() => key,
+            _ => return,
+        }
+    };
+
+    match license::refresh_stored_license(&key).await {
+        Ok((status, token)) => {
+            if let Err(error) = apply_pro_activation(state, app, status, &token) {
+                eprintln!("Failed to apply refreshed license: {error}");
+            }
+        }
+        Err(error) => {
+            eprintln!("Could not refresh stored license: {error}");
+        }
+    }
+}
+
 #[cfg(debug_assertions)]
 fn unlock_dev_pro_if_needed(state: &AppState, app: &AppHandle) {
     let should_unlock = {
@@ -595,6 +619,10 @@ pub fn run() {
         ))
         .setup(|app| {
             let db = Arc::new(Mutex::new(Database::new(&app.handle())?));
+            {
+                let db_guard = db.lock();
+                license::init_machine_id(&db_guard)?;
+            }
             let system_theme = app
                 .get_webview_window("main")
                 .map(|window| window_util::system_default_theme(&window))
@@ -632,6 +660,15 @@ pub fn run() {
             };
 
             app.manage(state);
+
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        refresh_license_on_startup(&state, &handle).await;
+                    }
+                });
+            }
 
             #[cfg(debug_assertions)]
             if let Some(state) = app.try_state::<AppState>() {
