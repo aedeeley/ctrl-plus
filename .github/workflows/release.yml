@@ -98,8 +98,8 @@ jobs:
 
             const body = [
               "## What's new",
-              "- Pro license now survives updates: the app stores a stable device ID and automatically re-validates your saved key on launch, so you no longer have to re-enter your activation key after updating",
-              "- Settings pre-fills your saved license key if online re-activation can't reach the server, so restoring Pro is a single click",
+              "- Settings menu reordered: General, Appearance, Pro, Update",
+              "- Renamed \"About\" tab to \"Update\" and \"ctrl+ pro\" tab to \"Pro\"",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",

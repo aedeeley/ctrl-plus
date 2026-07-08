@@ -12,7 +12,7 @@ import { SelectField } from "./SelectField";
 import { UpgradePrompt } from "./UpgradePrompt";
 import { UpdateSection } from "./UpdateSection";
 
-type SettingsTab = "appearance" | "general" | "pro" | "about";
+type SettingsTab = "general" | "appearance" | "pro" | "update";
 
 interface SettingsProps {
   settings: AppSettings;
@@ -27,10 +27,10 @@ interface SettingsProps {
 }
 
 const SETTINGS_TABS: { id: SettingsTab; label: string; pro?: boolean }[] = [
-  { id: "appearance", label: "Appearance" },
   { id: "general", label: "General" },
-  { id: "pro", label: "ctrl+ pro", pro: true },
-  { id: "about", label: "About" },
+  { id: "appearance", label: "Appearance" },
+  { id: "pro", label: "Pro", pro: true },
+  { id: "update", label: "Update" },
 ];
 
 export function Settings({
@@ -45,7 +45,7 @@ export function Settings({
   onRecenter,
 }: SettingsProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const isPro = license.tier === "pro";
 
   useEffect(() => {
@@ -206,7 +206,7 @@ export function Settings({
           </div>
         )}
 
-        {activeTab === "about" && (
+        {activeTab === "update" && (
           <div className="settings-tab-panel" role="tabpanel">
             <UpdateSection />
             <p className="settings-note">
