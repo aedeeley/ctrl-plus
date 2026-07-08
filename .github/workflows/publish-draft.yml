@@ -1,0 +1,51 @@
+name: Publish draft release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        default: v0.1.2
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish GitHub release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = "${{ inputs.tag }}";
+            const version = tag.replace(/^v/, "");
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag,
+            });
+
+            const body = [
+              "## What's new",
+              "- Fix Pro license activation (JWT verification)",
+              "- Add remove-from-device to free your license key",
+              "- Free tier stays locked until activation",
+              "",
+              "## Downloads",
+              "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",
+              "- Windows (x64): ctrl+_" + version + "_x64_en-US.msi",
+              "- Windows on ARM: ctrl+_" + version + "_arm64-setup.exe",
+            ].join("\n");
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.id,
+              name: "ctrl+ " + tag,
+              body,
+              draft: false,
+              make_latest: true,
+            });

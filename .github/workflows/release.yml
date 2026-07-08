@@ -63,6 +63,7 @@ jobs:
         with:
           script: |
             const tag = context.ref.replace("refs/tags/", "");
+            const version = tag.replace(/^v/, "");
             const { owner, repo } = context.repo;
             const { data: release } = await github.rest.repos.getReleaseByTag({
               owner,
@@ -73,20 +74,20 @@ jobs:
             const body = [
               "## What's new",
               "- Fix Pro license activation (JWT verification)",
-              '- Add "Remove from this device" to free your license key',
+              "- Add remove-from-device to free your license key",
               "- Free tier stays locked until activation",
               "",
               "## Downloads",
-              "- **Windows (x64):** `ctrl+_${tag.replace(/^v/, "")}_x64-setup.exe` (recommended)",
-              "- **Windows (x64):** `ctrl+_${tag.replace(/^v/, "")}_x64_en-US.msi`",
-              "- **Windows on ARM:** `ctrl+_${tag.replace(/^v/, "")}_arm64-setup.exe`",
+              "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",
+              "- Windows (x64): ctrl+_" + version + "_x64_en-US.msi",
+              "- Windows on ARM: ctrl+_" + version + "_arm64-setup.exe",
             ].join("\n");
 
             await github.rest.repos.updateRelease({
               owner,
               repo,
               release_id: release.id,
-              name: `ctrl+ ${tag}`,
+              name: "ctrl+ " + tag,
               body,
               draft: false,
               make_latest: true,
