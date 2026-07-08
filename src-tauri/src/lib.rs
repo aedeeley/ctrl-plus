@@ -52,34 +52,6 @@ fn clear_history(state: State<AppState>, app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn toggle_pin(state: State<AppState>, app: AppHandle, id: i64) -> Result<(), String> {
-    let db = state.db.lock();
-    if !license::is_pro(&db) {
-        return Err("Pin is a Pro feature".to_string());
-    }
-    db.toggle_pin(id)?;
-    drop(db);
-    let _ = app.emit("clipboard-updated", ());
-    Ok(())
-}
-
-#[tauri::command]
-fn reorder_items(
-    state: State<AppState>,
-    app: AppHandle,
-    ordered_ids: Vec<i64>,
-) -> Result<(), String> {
-    let db = state.db.lock();
-    if !license::is_pro(&db) {
-        return Err("Reorder is a Pro feature".to_string());
-    }
-    db.reorder_items(&ordered_ids)?;
-    drop(db);
-    let _ = app.emit("clipboard-updated", ());
-    Ok(())
-}
-
-#[tauri::command]
 fn get_license_status(state: State<AppState>) -> Result<LicenseStatus, String> {
     let db = state.db.lock();
     license::load_license(&db)
@@ -631,8 +603,6 @@ pub fn run() {
                 tauri::generate_handler![
                     get_history,
                     clear_history,
-                    toggle_pin,
-                    reorder_items,
                     get_settings,
                     update_settings,
                     paste_item,
@@ -649,8 +619,6 @@ pub fn run() {
                 tauri::generate_handler![
                     get_history,
                     clear_history,
-                    toggle_pin,
-                    reorder_items,
                     get_settings,
                     update_settings,
                     paste_item,
