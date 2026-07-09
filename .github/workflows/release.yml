@@ -98,8 +98,9 @@ jobs:
 
             const body = [
               "## What's new",
-              "- Settings menu reordered: General, Appearance, Pro, Update",
-              "- Renamed \"About\" tab to \"Update\" and \"ctrl+ pro\" tab to \"Pro\"",
+              "- Subtle fade and slide animations when the overlay opens and closes",
+              "- Redesigned General settings tab with grouped sections",
+              "- Moved window position controls from Appearance to General",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",

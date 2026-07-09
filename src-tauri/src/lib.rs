@@ -12,7 +12,8 @@ use parking_lot::Mutex;
 use paste::{capture_paste_target, restore_and_paste, PasteTarget};
 use serde::Serialize;
 use settings::AppSettings;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::menu::{Menu, MenuItem};
@@ -31,7 +32,10 @@ struct AppState {
     overlay_shown_at: Mutex<Option<Instant>>,
     window_position: Mutex<Option<(i32, i32)>>,
     is_dragging: AtomicBool,
+    hide_generation: AtomicU64,
 }
+
+const OVERLAY_HIDE_ANIM_MS: u64 = 160;
 
 #[derive(Serialize, Clone, Copy)]
 struct OverlayShownEvent {
@@ -282,10 +286,7 @@ fn paste_item(state: State<AppState>, app: AppHandle, id: i64) -> Result<(), Str
 
     set_clipboard_suppressed(&state.ignore_clipboard, &item.content)?;
 
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.hide();
-        window_util::hide_from_taskbar(&window);
-    }
+    hide_overlay_window(&app, false)?;
 
     restore_and_paste(target.unwrap_or_default(), &item.content)?;
 
@@ -294,7 +295,7 @@ fn paste_item(state: State<AppState>, app: AppHandle, id: i64) -> Result<(), Str
 
 #[tauri::command]
 fn hide_overlay(app: AppHandle) -> Result<(), String> {
-    hide_overlay_window(&app)
+    hide_overlay_window(&app, true)
 }
 
 fn flush_window_position(state: &AppState, window: &WebviewWindow) {
@@ -347,6 +348,8 @@ fn reset_window_position(state: State<AppState>, app: AppHandle) -> Result<(), S
 }
 
 fn show_overlay(app: &AppHandle, state: &AppState) -> Result<(), String> {
+    state.hide_generation.fetch_add(1, Ordering::SeqCst);
+
     let show_started = Instant::now();
 
     let exclude_hwnd = app
@@ -374,7 +377,7 @@ fn show_overlay(app: &AppHandle, state: &AppState) -> Result<(), String> {
     Ok(())
 }
 
-fn hide_overlay_window(app: &AppHandle) -> Result<(), String> {
+fn hide_overlay_immediate(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
         window.hide().map_err(|e| e.to_string())?;
         window_util::hide_from_taskbar(&window);
@@ -383,6 +386,43 @@ fn hide_overlay_window(app: &AppHandle) -> Result<(), String> {
     if let Some(state) = app.try_state::<AppState>() {
         *state.overlay_shown_at.lock() = None;
     }
+
+    Ok(())
+}
+
+fn hide_overlay_window(app: &AppHandle, animate: bool) -> Result<(), String> {
+    let visible = app
+        .get_webview_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+
+    if !visible {
+        return Ok(());
+    }
+
+    if !animate {
+        return hide_overlay_immediate(app);
+    }
+
+    let generation = app
+        .try_state::<AppState>()
+        .map(|state| state.hide_generation.fetch_add(1, Ordering::SeqCst) + 1)
+        .unwrap_or(1);
+
+    let _ = app.emit("overlay-hiding", ());
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(OVERLAY_HIDE_ANIM_MS)).await;
+
+        if let Some(state) = app.try_state::<AppState>() {
+            if state.hide_generation.load(Ordering::SeqCst) != generation {
+                return;
+            }
+        }
+
+        let _ = hide_overlay_immediate(&app);
+    });
 
     Ok(())
 }
@@ -403,7 +443,7 @@ fn toggle_overlay(app: &AppHandle, state: &AppState) {
     if let Some(window) = app.get_webview_window("main") {
         let visible = window.is_visible().unwrap_or(false);
         if visible {
-            let _ = hide_overlay_window(app);
+            let _ = hide_overlay_window(app, true);
         } else if let Err(error) = show_overlay(app, state) {
             eprintln!("Failed to show overlay: {error}");
         }
@@ -657,6 +697,7 @@ pub fn run() {
                 overlay_shown_at: Mutex::new(None),
                 window_position: Mutex::new(window_position),
                 is_dragging: AtomicBool::new(false),
+                hide_generation: AtomicU64::new(0),
             };
 
             app.manage(state);
@@ -685,10 +726,7 @@ pub fn run() {
                 window.on_window_event(move |event| match event {
                     WindowEvent::CloseRequested { api, .. } => {
                         api.prevent_close();
-                        let _ = handle.get_webview_window("main").map(|window| {
-                            let _ = window.hide();
-                            window_util::hide_from_taskbar(&window);
-                        });
+                        let _ = hide_overlay_window(&handle, true);
                     }
                     WindowEvent::Moved(position) => {
                         if let Some(state) = handle.try_state::<AppState>() {
@@ -720,7 +758,7 @@ pub fn run() {
                             .unwrap_or(false);
 
                         if visible && should_hide_on_focus_loss(&handle) {
-                            let _ = hide_overlay_window(&handle);
+                            let _ = hide_overlay_window(&handle, true);
                         }
                     }
                     _ => {}

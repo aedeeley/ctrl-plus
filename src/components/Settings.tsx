@@ -116,78 +116,97 @@ export function Settings({
                 onUpgradeClick={handleUpgradeClick}
                 onChange={(shadowStyle) => onChange({ ...settings, shadowStyle })}
               />
-              <div className="appearance-row">
-                <div className="appearance-row-header">
-                  <div className="appearance-row-titles">
-                    <span className="appearance-label">Position</span>
-                    <span className="appearance-caption">
-                      Drag the move handle in the header to reposition
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="ghost-button reset-position-button"
-                  onClick={onRecenter}
-                >
-                  Reset to center
-                </button>
-              </div>
             </div>
           </div>
         )}
 
         {activeTab === "general" && (
-          <div className="settings-tab-panel" role="tabpanel">
-            <div className="settings-group">
-              <SelectField
-                label="Global hotkey"
-                value={settings.hotkey}
-                options={HOTKEY_OPTIONS.map((option) => ({
-                  value: option,
-                  label: option,
-                }))}
-                onChange={(hotkey) => onChange({ ...settings, hotkey })}
-              />
+          <div className="settings-tab-panel general-panel" role="tabpanel">
+            <div className="settings-card">
+              <section className="settings-section">
+                <h3 className="settings-section-title">Shortcuts</h3>
+                <div className="settings-section-grid">
+                  <SelectField
+                    label="Global hotkey"
+                    value={settings.hotkey}
+                    options={HOTKEY_OPTIONS.map((option) => ({
+                      value: option,
+                      label: option,
+                    }))}
+                    onChange={(hotkey) => onChange({ ...settings, hotkey })}
+                  />
 
-              {isPro ? (
-                <SelectField
-                  label="History limit"
-                  value={settings.maxHistory}
-                  options={HISTORY_LIMIT_OPTIONS.map((option) => ({
-                    value: option,
-                    label: `${option} items`,
-                  }))}
-                  onChange={(maxHistory) => onChange({ ...settings, maxHistory })}
-                />
-              ) : (
-                <div className="setting-static">
-                  <span className="select-label">History limit</span>
-                  <div className="setting-static-value">
-                    {FREE_MAX_HISTORY} items (Free)
-                  </div>
+                  {isPro ? (
+                    <SelectField
+                      label="History limit"
+                      value={settings.maxHistory}
+                      options={HISTORY_LIMIT_OPTIONS.map((option) => ({
+                        value: option,
+                        label: `${option} items`,
+                      }))}
+                      onChange={(maxHistory) =>
+                        onChange({ ...settings, maxHistory })
+                      }
+                    />
+                  ) : (
+                    <div className="setting-static">
+                      <span className="select-label">History limit</span>
+                      <div className="setting-static-value">
+                        {FREE_MAX_HISTORY} items
+                        <span className="setting-static-badge">Free</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </section>
 
-              <label className="setting-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.launchOnStartup}
-                  onChange={(event) =>
-                    onChange({
-                      ...settings,
-                      launchOnStartup: event.target.checked,
-                    })
-                  }
-                />
-                <span>Launch on Windows startup</span>
-              </label>
+              <div className="settings-section-divider" aria-hidden="true" />
+
+              <section className="settings-section">
+                <h3 className="settings-section-title">Position</h3>
+                <div className="setting-inline-row">
+                  <div className="setting-inline-copy">
+                    <span className="setting-inline-label">Window placement</span>
+                    <span className="setting-inline-caption">
+                      Drag the move handle in the header to reposition
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button setting-inline-action"
+                    onClick={onRecenter}
+                  >
+                    Reset to center
+                  </button>
+                </div>
+              </section>
+
+              <div className="settings-section-divider" aria-hidden="true" />
+
+              <section className="settings-section">
+                <h3 className="settings-section-title">System</h3>
+                <label className="setting-inline-row setting-inline-toggle">
+                  <span className="setting-inline-label">
+                    Launch on Windows startup
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.launchOnStartup}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        launchOnStartup: event.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </section>
             </div>
 
-            <div className="settings-actions">
+            <div className="settings-footer-actions">
               <button
                 type="button"
-                className="danger-button"
+                className="danger-button danger-button-full"
                 onClick={onClearHistory}
               >
                 Clear history

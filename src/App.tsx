@@ -17,6 +17,8 @@ function formatOpenMs(ms: number): string {
   return `${Math.round(ms)} ms`;
 }
 
+type OverlayAnim = "idle" | "entering" | "visible" | "exiting";
+
 function App() {
   const [items, setItems] = useState<ClipboardItem[]>([]);
   const [query, setQuery] = useState("");
@@ -26,6 +28,7 @@ function App() {
   const [license, setLicense] = useState<LicenseStatus>({ tier: "free" });
   const [showSettings, setShowSettings] = useState(false);
   const [openMs, setOpenMs] = useState<number | null>(null);
+  const [overlayAnim, setOverlayAnim] = useState<OverlayAnim>("idle");
   const searchRef = useRef<HTMLInputElement>(null);
   const overlayCardRef = useRef<HTMLDivElement>(null);
 
@@ -111,11 +114,15 @@ function App() {
         setSelectedIndex(0);
         setHoveredIndex(null);
         setShowSettings(false);
+        setOverlayAnim("entering");
 
         requestAnimationFrame(() => {
           setOpenMs(backendMs + performance.now() - paintStarted);
           searchRef.current?.focus();
         });
+      }),
+      listen("overlay-hiding", () => {
+        setOverlayAnim("exiting");
       }),
       listen("open-settings", () => {
         setShowSettings(true);
@@ -141,6 +148,34 @@ function App() {
   const hideOverlay = useCallback(async () => {
     await invoke("hide_overlay");
   }, []);
+
+  const handleOverlayAnimationEnd = useCallback(
+    (event: React.AnimationEvent<HTMLDivElement>) => {
+      if (event.target !== overlayCardRef.current) {
+        return;
+      }
+
+      setOverlayAnim((current) => {
+        if (current === "entering") {
+          return "visible";
+        }
+        if (current === "exiting") {
+          return "idle";
+        }
+        return current;
+      });
+    },
+    [],
+  );
+
+  const overlayAnimClass =
+    overlayAnim === "entering"
+      ? "overlay-enter-active"
+      : overlayAnim === "visible"
+        ? "overlay-visible"
+        : overlayAnim === "exiting"
+          ? "overlay-exit-active"
+          : "";
 
   const endWindowDrag = useCallback(() => {
     void invoke("end_window_drag");
@@ -331,13 +366,14 @@ function App() {
   return (
     <main className="overlay-shell">
       <div
-        className={`overlay-card${showSettings ? " settings-mode" : ""}`}
+        className={`overlay-card${showSettings ? " settings-mode" : ""}${overlayAnimClass ? ` ${overlayAnimClass}` : ""}`}
         ref={overlayCardRef}
         data-theme={settings.theme}
         data-border={settings.borderStyle}
         data-font={settings.fontStyle}
         data-shadow={settings.shadowStyle}
         onMouseDown={showSettings ? undefined : handleOverlayMouseDown}
+        onAnimationEnd={handleOverlayAnimationEnd}
       >
         <header
           className={`overlay-header${showSettings ? " settings-view" : ""}`}
