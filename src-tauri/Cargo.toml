@@ -1,6 +1,6 @@
 [package]
 name = "ctrl-plus"
-version = "0.2.5"
+version = "0.2.6"
 description = "A lightweight multi-clipboard manager for Windows"
 authors = ["alexd"]
 license = "PolyForm-Noncommercial-1.0.0"

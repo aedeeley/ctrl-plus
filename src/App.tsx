@@ -141,6 +141,10 @@ function App() {
     };
   }, [loadHistory, loadSettings]);
 
+  const copyItem = useCallback(async (item: ClipboardItem) => {
+    await invoke("copy_item", { id: item.id });
+  }, []);
+
   const pasteItem = useCallback(async (item: ClipboardItem) => {
     await invoke("paste_item", { id: item.id });
   }, []);
@@ -234,29 +238,6 @@ function App() {
   );
 
   const activeIndex = hoveredIndex ?? selectedIndex;
-
-  const pasteActiveItem = useCallback(() => {
-    const item = filteredItems[activeIndex];
-    if (item) {
-      void pasteItem(item);
-    }
-  }, [activeIndex, filteredItems, pasteItem]);
-
-  const handleOverlayMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (showSettings || event.button !== 0) {
-        return;
-      }
-
-      const target = event.target as HTMLElement;
-      if (target.closest("button, input, select, textarea, a, label, .select-menu, .select-field, .item-drag-handle, .item-pin-button")) {
-        return;
-      }
-
-      pasteActiveItem();
-    },
-    [pasteActiveItem, showSettings],
-  );
 
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (filteredItems.length === 0) {
@@ -372,7 +353,6 @@ function App() {
         data-border={settings.borderStyle}
         data-font={settings.fontStyle}
         data-shadow={settings.shadowStyle}
-        onMouseDown={showSettings ? undefined : handleOverlayMouseDown}
         onAnimationEnd={handleOverlayAnimationEnd}
       >
         <header
@@ -538,6 +518,7 @@ function App() {
                   canReorder={isPro && searchIsEmpty}
                   onHoverIndexChange={setHoveredIndex}
                   onSelect={setSelectedIndex}
+                  onCopy={copyItem}
                   onPaste={pasteItem}
                   onTogglePin={handleTogglePin}
                   onReorder={handleReorder}
@@ -573,6 +554,8 @@ function App() {
                       navigate
                     </span>
                     <span className="footer-dot">·</span>
+                    <span className="footer-hint">click copy</span>
+                    <span className="footer-dot">·</span>
                     <span className="footer-hint">
                       <svg
                         className="footer-icon"
@@ -587,7 +570,7 @@ function App() {
                         <path d="M9 10l-4 4 4 4" />
                         <path d="M20 4v7a4 4 0 0 1-4 4H5" />
                       </svg>
-                      paste
+                      Enter paste
                     </span>
                     {searchIsEmpty && (
                       <>
