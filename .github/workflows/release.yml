@@ -98,9 +98,10 @@ jobs:
 
             const body = [
               "## What's new",
-              "- Subtle fade and slide animations when the overlay opens and closes",
-              "- Redesigned General settings tab with grouped sections",
-              "- Moved window position controls from Appearance to General",
+              "- Click a listing to copy without closing the overlay",
+              "- Dedicated paste button on each row to paste into the previous app",
+              "- Brief \"Copied\" feedback when copying from the overlay",
+              "- Enter and number keys still paste for quick access",
               "",
               "## Downloads",
               "- Windows (x64): ctrl+_" + version + "_x64-setup.exe (recommended)",

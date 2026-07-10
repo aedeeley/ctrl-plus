@@ -275,6 +275,19 @@ fn update_settings(
 }
 
 #[tauri::command]
+fn copy_item(state: State<AppState>, id: i64) -> Result<(), String> {
+    let item = state
+        .db
+        .lock()
+        .get_by_id(id)?
+        .ok_or_else(|| "Item not found".to_string())?;
+
+    set_clipboard_suppressed(&state.ignore_clipboard, &item.content)?;
+
+    Ok(())
+}
+
+#[tauri::command]
 fn paste_item(state: State<AppState>, app: AppHandle, id: i64) -> Result<(), String> {
     let item = state
         .db
@@ -781,6 +794,7 @@ pub fn run() {
                     reorder_items,
                     get_settings,
                     update_settings,
+                    copy_item,
                     paste_item,
                     hide_overlay,
                     start_window_drag,
@@ -802,6 +816,7 @@ pub fn run() {
                     reorder_items,
                     get_settings,
                     update_settings,
+                    copy_item,
                     paste_item,
                     hide_overlay,
                     start_window_drag,

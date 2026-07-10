@@ -1366,6 +1366,50 @@ input {
     color 0.12s ease;
 }
 
+.item-paste-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  position: relative;
+  z-index: 1;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.item-paste-button .item-paste-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  pointer-events: none;
+  color: inherit;
+}
+
+.clipboard-item:hover .item-paste-button,
+.clipboard-item.active .item-paste-button {
+  opacity: 1;
+}
+
+.item-paste-button:hover {
+  background: var(--surface);
+  color: var(--accent-text);
+}
+
+.clipboard-item.active .item-paste-button {
+  color: var(--accent-text);
+}
+
 .item-pin-button:not(.pinned) {
   opacity: 0;
 }
@@ -1464,6 +1508,19 @@ input {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text);
+}
+
+.item-copied-label {
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.clipboard-item.copied {
+  border-color: var(--accent-border);
+}
+
+.clipboard-item.copied.active {
+  box-shadow: 0 0 0 1px var(--accent-border);
 }
 
 .item-time {

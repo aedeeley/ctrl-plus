@@ -11,6 +11,7 @@ interface ClipboardListProps {
   canReorder: boolean;
   onHoverIndexChange: (index: number | null) => void;
   onSelect: (index: number) => void;
+  onCopy: (item: ClipboardItem) => void;
   onPaste: (item: ClipboardItem) => void;
   onTogglePin: (item: ClipboardItem) => void;
   onReorder: (orderedIds: number[]) => void;
@@ -97,6 +98,24 @@ function PinIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function PasteIcon() {
+  return (
+    <svg
+      className="item-paste-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+    </svg>
+  );
+}
+
 interface ClipboardRowProps {
   item: ClipboardItem;
   index: number;
@@ -106,9 +125,11 @@ interface ClipboardRowProps {
   shortcutLabel: string | null;
   isPro: boolean;
   canReorder: boolean;
+  isCopied: boolean;
   registerRef: (index: number, node: HTMLDivElement | null) => void;
   onHoverIndexChange: (index: number | null) => void;
   onSelect: (index: number) => void;
+  onCopy: (item: ClipboardItem) => void;
   onPaste: (item: ClipboardItem) => void;
   onTogglePin: (item: ClipboardItem) => void;
   onDragPointerDown: (
@@ -129,9 +150,11 @@ const ClipboardRow = memo(function ClipboardRow({
   shortcutLabel,
   isPro,
   canReorder,
+  isCopied,
   registerRef,
   onHoverIndexChange,
   onSelect,
+  onCopy,
   onPaste,
   onTogglePin,
   onDragPointerDown,
@@ -155,6 +178,7 @@ const ClipboardRow = memo(function ClipboardRow({
     item.pinned ? "pinned" : "",
     isDragging ? "dragging" : "",
     isDragOver ? "drag-over" : "",
+    isCopied ? "copied" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -186,7 +210,7 @@ const ClipboardRow = memo(function ClipboardRow({
         onClick={(event) => {
           event.stopPropagation();
           onSelect(index);
-          onPaste(item);
+          onCopy(item);
         }}
       >
         {shortcutLabel ? (
@@ -195,8 +219,25 @@ const ClipboardRow = memo(function ClipboardRow({
           </span>
         ) : null}
         <span className="item-preview" title={timeTitle}>
-          {preview}
+          {isCopied ? (
+            <span className="item-copied-label">Copied</span>
+          ) : (
+            preview
+          )}
         </span>
+      </button>
+
+      <button
+        type="button"
+        className="item-paste-button"
+        aria-label="Paste into previous app"
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(index);
+          onPaste(item);
+        }}
+      >
+        <PasteIcon />
       </button>
 
       {isPro ? (
@@ -226,6 +267,7 @@ export function ClipboardList({
   canReorder,
   onHoverIndexChange,
   onSelect,
+  onCopy,
   onPaste,
   onTogglePin,
   onReorder,
@@ -235,9 +277,34 @@ export function ClipboardList({
   const itemRefs = useRef(new Map<number, HTMLDivElement>());
   const dragSourceRef = useRef<number | null>(null);
   const dragOverRef = useRef<number | null>(null);
+  const copiedTimeoutRef = useRef<number | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  const handleCopy = useCallback(
+    (item: ClipboardItem) => {
+      onCopy(item);
+      setCopiedId(item.id);
+      if (copiedTimeoutRef.current !== null) {
+        window.clearTimeout(copiedTimeoutRef.current);
+      }
+      copiedTimeoutRef.current = window.setTimeout(() => {
+        setCopiedId(null);
+        copiedTimeoutRef.current = null;
+      }, 1000);
+    },
+    [onCopy],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current !== null) {
+        window.clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const activeIndex = hoveredIndex ?? selectedIndex;
 
@@ -443,9 +510,11 @@ export function ClipboardList({
             }
             isPro={isPro}
             canReorder={canReorder}
+            isCopied={copiedId === item.id}
             registerRef={registerRef}
             onHoverIndexChange={onHoverIndexChange}
             onSelect={onSelect}
+            onCopy={handleCopy}
             onPaste={onPaste}
             onTogglePin={onTogglePin}
             onDragPointerDown={handleDragHandlePointerDown}
